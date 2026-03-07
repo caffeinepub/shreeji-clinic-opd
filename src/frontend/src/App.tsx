@@ -7,6 +7,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -40,6 +48,7 @@ import {
   FileText,
   Loader2,
   LogOut,
+  Menu,
   MessageSquare,
   PenLine,
   Plus,
@@ -234,6 +243,81 @@ function savePrescriptionHistory(
   localStorage.setItem(`shreeji_rx_history_${uid}`, JSON.stringify(records));
 }
 
+// ── Backup helpers ─────────────────────────────────────────────────────────
+
+interface BackupData {
+  version: number;
+  exportedAt: string;
+  patients: LocalPatient[];
+  prescriptionHistories: Record<string, PrescriptionRecord[]>;
+}
+
+function exportBackup(patients: LocalPatient[]): void {
+  const histories: Record<string, PrescriptionRecord[]> = {};
+  for (const p of patients) {
+    const h = loadPrescriptionHistory(p.uid);
+    if (h.length > 0) histories[p.uid] = h;
+  }
+  const backup: BackupData = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    patients,
+    prescriptionHistories: histories,
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], {
+    type: "application/json;charset=utf-8;",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  const dateStr = new Date().toISOString().slice(0, 10);
+  a.download = `shreeji-clinic-backup-${dateStr}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast.success("Backup file downloaded successfully");
+}
+
+function importBackupFile(
+  file: File,
+  onImport: (patients: LocalPatient[]) => void,
+): void {
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const data = JSON.parse(ev.target?.result as string) as BackupData;
+      if (!data.patients || !Array.isArray(data.patients)) {
+        toast.error("Invalid backup file format");
+        return;
+      }
+      // Merge patients: backup wins per-UID
+      const existing = loadLocalPatients();
+      const existingMap = new Map(existing.map((p) => [p.uid, p]));
+      for (const p of data.patients) {
+        existingMap.set(p.uid, p);
+      }
+      const merged = Array.from(existingMap.values());
+      saveLocalPatients(merged);
+      // Restore prescription histories
+      if (data.prescriptionHistories) {
+        for (const [uid, history] of Object.entries(
+          data.prescriptionHistories,
+        )) {
+          if (Array.isArray(history)) {
+            savePrescriptionHistory(uid, history);
+          }
+        }
+      }
+      onImport(merged);
+      toast.success(
+        `Backup restored: ${data.patients.length} patient(s) imported`,
+      );
+    } catch {
+      toast.error("Failed to read backup file. Please check the file.");
+    }
+  };
+  reader.readAsText(file);
+}
+
 const COLORS = [
   { name: "black", value: "#000000", label: "Black" },
   { name: "blue", value: "#1a56db", label: "Blue" },
@@ -249,19 +333,27 @@ function Header({
   currentPage,
   session,
   onLogout,
+  onExportExcel,
+  onBackup,
+  onRestoreTrigger,
 }: {
   onNavigate: (p: Page) => void;
   currentPage: Page;
   session: AuthSession;
   onLogout: () => void;
+  onExportExcel: () => void;
+  onBackup: () => void;
+  onRestoreTrigger: () => void;
 }) {
   return (
     <header className="clinic-header-gradient text-white shadow-md no-print">
       <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+        {/* Brand / Logo */}
         <button
           type="button"
           className="flex items-center gap-3 hover:opacity-90 transition-opacity flex-shrink-0"
           onClick={() => onNavigate("dashboard")}
+          data-ocid="header.brand_button"
         >
           <img
             src="/assets/generated/logo-white-circle.dim_400x400.png"
@@ -277,52 +369,109 @@ function Header({
             </p>
           </div>
         </button>
-        <nav className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => onNavigate("dashboard")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              currentPage === "dashboard"
-                ? "bg-white/20 text-white"
-                : "text-white/70 hover:text-white hover:bg-white/10"
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            <span className="hidden sm:inline">Patients</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => onNavigate("register")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              currentPage === "register"
-                ? "bg-white/20 text-white"
-                : "text-white/70 hover:text-white hover:bg-white/10"
-            }`}
-          >
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Register</span>
-          </button>
 
-          {/* Doctor badge */}
+        {/* Right side nav */}
+        <nav className="flex items-center gap-2">
+          {/* Doctor badge — visible on sm+ */}
           <div
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/10 text-white/90 text-sm font-medium ml-1 border border-white/20"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/10 text-white/90 text-sm font-medium border border-white/20"
             data-ocid="header.doctor_badge"
           >
             <Stethoscope className="w-3.5 h-3.5 text-white/70" />
             <span>{session.displayName}</span>
           </div>
 
-          {/* Logout */}
-          <button
-            type="button"
-            onClick={onLogout}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors text-white/70 hover:text-white hover:bg-white/10"
-            title="Logout"
-            data-ocid="header.logout_button"
-          >
-            <LogOut className="w-4 h-4" />
-            <span className="hidden sm:inline">Logout</span>
-          </button>
+          {/* Unified Menu Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors text-white/90 hover:text-white hover:bg-white/15 border border-white/20"
+                data-ocid="header.menu_button"
+                aria-label="Open menu"
+              >
+                <Menu className="w-4 h-4" />
+                <span className="hidden sm:inline">Menu</span>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              className="w-52"
+              data-ocid="header.menu_dropdown_menu"
+            >
+              {/* Navigation */}
+              <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wide pb-1">
+                Navigation
+              </DropdownMenuLabel>
+              <DropdownMenuItem
+                onClick={() => onNavigate("dashboard")}
+                className={`gap-2 cursor-pointer ${currentPage === "dashboard" ? "bg-accent" : ""}`}
+                data-ocid="header.patients_link"
+              >
+                <Users className="w-4 h-4 text-clinic-blue" />
+                Patients
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onNavigate("register")}
+                className={`gap-2 cursor-pointer ${currentPage === "register" ? "bg-accent" : ""}`}
+                data-ocid="header.register_link"
+              >
+                <Plus className="w-4 h-4 text-clinic-red" />
+                Register Patient
+              </DropdownMenuItem>
+
+              <DropdownMenuSeparator />
+
+              {/* Data actions */}
+              <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wide pb-1">
+                Data
+              </DropdownMenuLabel>
+              <DropdownMenuItem
+                onClick={onExportExcel}
+                className="gap-2 cursor-pointer"
+                data-ocid="header.export_excel_button"
+              >
+                <Download className="w-4 h-4 text-muted-foreground" />
+                Export Excel
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={onBackup}
+                className="gap-2 cursor-pointer"
+                data-ocid="header.backup_button"
+              >
+                <Download className="w-4 h-4 text-clinic-blue" />
+                Backup
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={onRestoreTrigger}
+                className="gap-2 cursor-pointer"
+                data-ocid="header.restore_button"
+              >
+                <Upload className="w-4 h-4 text-muted-foreground" />
+                Restore
+              </DropdownMenuItem>
+
+              <DropdownMenuSeparator />
+
+              {/* Account */}
+              <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wide pb-1">
+                Account
+              </DropdownMenuLabel>
+              {/* Doctor info — non-clickable */}
+              <div className="flex items-center gap-2 px-2 py-1.5 text-sm text-foreground/80 select-none">
+                <Stethoscope className="w-4 h-4 text-clinic-blue flex-shrink-0" />
+                <span className="truncate">{session.displayName}</span>
+              </div>
+              <DropdownMenuItem
+                onClick={onLogout}
+                className="gap-2 cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
+                data-ocid="header.logout_button"
+              >
+                <LogOut className="w-4 h-4" />
+                Logout
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </nav>
       </div>
     </header>
@@ -356,72 +505,17 @@ function DashboardPage({
       p.uid.toLowerCase().includes(search.toLowerCase()),
   );
 
-  function exportToExcel() {
-    const headers = [
-      "UID",
-      "Name",
-      "Age",
-      "Sex",
-      "Contact",
-      "Doctor",
-      "Registration Date",
-    ];
-    const rows = patients.map((p) => [
-      p.uid,
-      p.name,
-      String(p.age),
-      p.sex,
-      p.contact,
-      p.doctorName,
-      p.registrationDate,
-    ]);
-    const csvContent = [headers, ...rows]
-      .map((row) =>
-        row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","),
-      )
-      .join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `shreeji-clinic-patients-${todayStr()}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("CSV file exported successfully");
-  }
-
   return (
     <div className="max-w-6xl mx-auto px-4 py-6" data-ocid="dashboard.page">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-        <div>
-          <h2 className="font-display text-2xl font-bold text-foreground">
-            Patient Dashboard
-          </h2>
-          <p className="text-muted-foreground text-sm mt-1">
-            {patients.length} registered patient
-            {patients.length !== 1 ? "s" : ""}
-          </p>
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          <Button
-            variant="outline"
-            className="gap-2"
-            onClick={exportToExcel}
-            data-ocid="dashboard.export_excel_button"
-          >
-            <Download className="w-4 h-4" />
-            Export Excel
-          </Button>
-          <Button
-            className="gap-2 bg-clinic-red hover:bg-clinic-red/90 text-white"
-            onClick={onNewPatient}
-            data-ocid="dashboard.new_patient_button"
-          >
-            <Plus className="w-4 h-4" />
-            New Patient
-          </Button>
-        </div>
+      <div className="mb-6">
+        <h2 className="font-display text-2xl font-bold text-foreground">
+          Patient Dashboard
+        </h2>
+        <p className="text-muted-foreground text-sm mt-1">
+          {patients.length} registered patient
+          {patients.length !== 1 ? "s" : ""}
+        </p>
       </div>
 
       {/* Search */}
@@ -1969,17 +2063,40 @@ function AppShell({
   const { actor, isFetching } = useActor();
   const queryClient = useQueryClient();
 
-  // Fetch from backend
+  // ── Lifted data action refs (for header menu) ─────────────────────────────
+  const headerRestoreInputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch from backend — MERGE with localStorage, never overwrite with empty
   const { isLoading: backendLoading } = useQuery({
     queryKey: ["patients"],
     queryFn: async () => {
       if (!actor) return localPatients;
       try {
-        const patients = await actor.getAllPatients();
-        const local = patients.map(toLocalPatient);
-        setLocalPatients(local);
-        saveLocalPatients(local);
-        return local;
+        const backendPatients = await actor.getAllPatients();
+        const backendLocal = backendPatients.map(toLocalPatient);
+        // Merge: start with current local, override with backend data per UID
+        // then add any backend patients not in local
+        setLocalPatients((prevLocal) => {
+          const localMap = new Map(prevLocal.map((p) => [p.uid, p]));
+          for (const bp of backendLocal) {
+            localMap.set(bp.uid, bp);
+          }
+          const merged = Array.from(localMap.values());
+          // Sync any local-only patients back to backend
+          if (actor) {
+            for (const lp of prevLocal) {
+              const existsInBackend = backendLocal.some(
+                (bp) => bp.uid === lp.uid,
+              );
+              if (!existsInBackend) {
+                actor.register(toBackendPatient(lp)).catch(() => {});
+              }
+            }
+          }
+          saveLocalPatients(merged);
+          return merged;
+        });
+        return backendLocal;
       } catch {
         return localPatients;
       }
@@ -1989,34 +2106,47 @@ function AppShell({
 
   const registerMutation = useMutation({
     mutationFn: async (patient: LocalPatient) => {
-      if (actor) {
-        await actor.register(toBackendPatient(patient));
-      }
+      // Save locally first (always succeeds)
+      const currentLocal = loadLocalPatients();
       const updated = [
-        ...localPatients.filter((p) => p.uid !== patient.uid),
+        ...currentLocal.filter((p) => p.uid !== patient.uid),
         patient,
       ];
-      setLocalPatients(updated);
       saveLocalPatients(updated);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["patients"] });
+      setLocalPatients(updated);
+      // Then try backend (fire-and-forget on failure)
+      if (actor) {
+        try {
+          await actor.register(toBackendPatient(patient));
+        } catch {
+          // local save already succeeded — backend will sync later
+        }
+      }
     },
   });
 
   const updateMutation = useMutation({
     mutationFn: async (patient: LocalPatient) => {
-      if (actor) {
-        await actor.updatePatient(toBackendPatient(patient));
-      }
-      const updated = localPatients.map((p) =>
+      // Save locally first
+      const currentLocal = loadLocalPatients();
+      const updated = currentLocal.map((p) =>
         p.uid === patient.uid ? patient : p,
       );
-      setLocalPatients(updated);
       saveLocalPatients(updated);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["patients"] });
+      setLocalPatients(updated);
+      // Sync to backend (fire-and-forget on failure)
+      if (actor) {
+        try {
+          await actor.updatePatient(toBackendPatient(patient));
+        } catch {
+          // If patient doesn't exist on backend yet, register it
+          try {
+            await actor.register(toBackendPatient(patient));
+          } catch {
+            // local save already succeeded
+          }
+        }
+      }
     },
   });
 
@@ -2061,15 +2191,84 @@ function AppShell({
     [updateMutation],
   );
 
+  // ── Lifted export / backup / restore (called from both header and dashboard) ──
+  function handleExportExcel() {
+    const headers = [
+      "UID",
+      "Name",
+      "Age",
+      "Sex",
+      "Contact",
+      "Doctor",
+      "Registration Date",
+    ];
+    const rows = localPatients.map((p) => [
+      p.uid,
+      p.name,
+      String(p.age),
+      p.sex,
+      p.contact,
+      p.doctorName,
+      p.registrationDate,
+    ]);
+    const csvContent = [headers, ...rows]
+      .map((row) =>
+        row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","),
+      )
+      .join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `shreeji-clinic-patients-${todayStr()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("CSV file exported successfully");
+  }
+
+  function handleBackup() {
+    exportBackup(localPatients);
+  }
+
+  function handleRestoreTrigger() {
+    headerRestoreInputRef.current?.click();
+  }
+
+  function handleRestorePatients(restoredPatients: LocalPatient[]) {
+    setLocalPatients(restoredPatients);
+    if (actor) {
+      for (const p of restoredPatients) {
+        actor.register(toBackendPatient(p)).catch(() => {});
+      }
+    }
+  }
+
   const isLoading = backendLoading && localPatients.length === 0;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      {/* Hidden file input for restore (triggered from header menu) */}
+      <input
+        ref={headerRestoreInputRef}
+        type="file"
+        accept=".json,application/json"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) importBackupFile(file, handleRestorePatients);
+          e.target.value = "";
+        }}
+        data-ocid="header.restore_input"
+      />
+
       <Header
         onNavigate={(p) => setPage(p)}
         currentPage={page}
         session={session}
         onLogout={onLogout}
+        onExportExcel={handleExportExcel}
+        onBackup={handleBackup}
+        onRestoreTrigger={handleRestoreTrigger}
       />
 
       <main className="flex-1">
