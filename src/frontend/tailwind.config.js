@@ -20,9 +20,13 @@ export default {
         body: ['"Plus Jakarta Sans"', "system-ui", "sans-serif"],
       },
       colors: {
-        "clinic-teal": "oklch(var(--clinic-teal))",
+        "clinic-red": "oklch(var(--clinic-red))",
+        "clinic-red-light": "oklch(var(--clinic-red-light))",
         "clinic-blue": "oklch(var(--clinic-blue))",
+        "clinic-blue-light": "oklch(var(--clinic-blue-light))",
         "clinic-sky": "oklch(var(--clinic-sky))",
+        /* teal kept as alias → maps to blue for backwards compat */
+        "clinic-teal": "oklch(var(--clinic-teal))",
         "clinic-teal-light": "oklch(var(--clinic-teal-light))",
         border: "oklch(var(--border))",
         input: "oklch(var(--input))",

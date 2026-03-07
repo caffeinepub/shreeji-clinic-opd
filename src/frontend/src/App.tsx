@@ -64,6 +64,101 @@ import {
   getSession,
 } from "./components/LoginPage";
 
+// ── PWA Install Banner ─────────────────────────────────────────────────────
+
+function PWAInstallBanner() {
+  const [deferredPrompt, setDeferredPrompt] = useState<
+    | (Event & {
+        prompt: () => Promise<void>;
+        userChoice: Promise<{ outcome: string }>;
+      })
+    | null
+  >(null);
+  const [showBanner, setShowBanner] = useState(false);
+  const [dismissed, setDismissed] = useState(() => {
+    try {
+      return localStorage.getItem("pwa_banner_dismissed") === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    if (dismissed) return;
+    // Check if already installed
+    if (window.matchMedia("(display-mode: standalone)").matches) return;
+
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e as typeof deferredPrompt);
+      setShowBanner(true);
+    };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, [dismissed]);
+
+  async function handleInstall() {
+    if (!deferredPrompt) return;
+    await deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === "accepted") {
+      setShowBanner(false);
+      toast.success("App installed successfully!");
+    }
+    setDeferredPrompt(null);
+  }
+
+  function handleDismiss() {
+    setShowBanner(false);
+    setDismissed(true);
+    try {
+      localStorage.setItem("pwa_banner_dismissed", "true");
+    } catch {}
+  }
+
+  if (!showBanner || dismissed) return null;
+
+  return (
+    <div
+      className="no-print fixed bottom-0 left-0 right-0 z-50 p-3 bg-clinic-blue text-white shadow-lg flex items-center gap-3"
+      data-ocid="pwa.install_banner"
+    >
+      <img
+        src="/assets/generated/pwa-icon-192x192.dim_192x192.png"
+        alt="App Icon"
+        className="w-10 h-10 rounded-xl flex-shrink-0"
+      />
+      <div className="flex-1 min-w-0">
+        <p className="font-semibold text-sm leading-tight">
+          Install Shreeji Clinic OPD
+        </p>
+        <p className="text-white/80 text-xs mt-0.5">
+          Add to your home screen for quick access
+        </p>
+      </div>
+      <div className="flex gap-2 flex-shrink-0">
+        <button
+          type="button"
+          onClick={handleInstall}
+          className="bg-white text-clinic-blue text-xs font-semibold px-3 py-1.5 rounded-md hover:bg-white/90 transition-colors"
+          data-ocid="pwa.install_button"
+        >
+          Install
+        </button>
+        <button
+          type="button"
+          onClick={handleDismiss}
+          className="text-white/70 hover:text-white p-1.5"
+          data-ocid="pwa.dismiss_button"
+          aria-label="Dismiss"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Types ──────────────────────────────────────────────────────────────────
 
 type Page = "dashboard" | "register" | "prescription";
@@ -169,9 +264,9 @@ function Header({
           onClick={() => onNavigate("dashboard")}
         >
           <img
-            src="/assets/generated/logo-transparent.dim_400x400.png"
+            src="/assets/generated/logo-white-circle.dim_400x400.png"
             alt="Shreeji Clinic Logo"
-            className="w-12 h-12 object-contain"
+            className="w-12 h-12 object-cover rounded-full"
           />
           <div className="text-left">
             <h1 className="font-display text-xl font-bold leading-none">
@@ -319,7 +414,7 @@ function DashboardPage({
             Export Excel
           </Button>
           <Button
-            className="gap-2 bg-clinic-teal hover:bg-clinic-teal/90 text-white"
+            className="gap-2 bg-clinic-red hover:bg-clinic-red/90 text-white"
             onClick={onNewPatient}
             data-ocid="dashboard.new_patient_button"
           >
@@ -369,7 +464,7 @@ function DashboardPage({
           {!search && (
             <Button
               onClick={onNewPatient}
-              className="gap-2 bg-clinic-teal hover:bg-clinic-teal/90 text-white"
+              className="gap-2 bg-clinic-red hover:bg-clinic-red/90 text-white"
             >
               <Plus className="w-4 h-4" />
               Register Patient
@@ -447,7 +542,7 @@ function DashboardPage({
                       <Button
                         size="sm"
                         variant="outline"
-                        className="gap-1.5 text-xs text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                        className="gap-1.5 text-xs text-clinic-blue border-clinic-blue/30 hover:bg-clinic-blue/10 hover:text-clinic-blue"
                         onClick={() => onFollowUp(patient)}
                         data-ocid={`dashboard.followup_button.${idx + 1}`}
                       >
@@ -685,7 +780,7 @@ function RegistrationPage({
           </Button>
           <Button
             type="submit"
-            className="flex-1 bg-clinic-teal hover:bg-clinic-teal/90 text-white gap-2"
+            className="flex-1 bg-clinic-red hover:bg-clinic-red/90 text-white gap-2"
             disabled={isSaving}
             data-ocid="registration.submit_button"
           >
@@ -860,7 +955,7 @@ function DrawingCanvas({
             type="button"
             className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-colors ${
               tool === "pen"
-                ? "bg-clinic-teal text-white"
+                ? "bg-clinic-blue text-white"
                 : "bg-card text-muted-foreground hover:bg-accent"
             }`}
             onClick={() => setTool("pen")}
@@ -873,7 +968,7 @@ function DrawingCanvas({
             type="button"
             className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-colors ${
               tool === "eraser"
-                ? "bg-clinic-teal text-white"
+                ? "bg-clinic-blue text-white"
                 : "bg-card text-muted-foreground hover:bg-accent"
             }`}
             onClick={() => setTool("eraser")}
@@ -1013,7 +1108,7 @@ function ImageUploadPanel({
     <div className="space-y-4">
       <label
         htmlFor="image-upload-input"
-        className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-clinic-teal hover:bg-accent/30 transition-colors block"
+        className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-clinic-red hover:bg-clinic-red-light/30 transition-colors block"
         data-ocid="prescription.dropzone"
       >
         <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
@@ -1128,7 +1223,7 @@ function PatientHistoryModal({
                     type="button"
                     className={`w-full text-left p-3 rounded-lg border transition-colors ${
                       selectedRecord?.savedAt === record.savedAt
-                        ? "border-clinic-teal bg-clinic-teal/10"
+                        ? "border-clinic-blue bg-clinic-blue/10"
                         : "border-border hover:bg-accent/40"
                     }`}
                     onClick={() => setSelectedRecord(record)}
@@ -1202,7 +1297,7 @@ function PatientHistoryModal({
                     ))}
                     {/* Open & Edit button */}
                     <Button
-                      className="w-full gap-2 bg-clinic-teal hover:bg-clinic-teal/90 text-white mt-2"
+                      className="w-full gap-2 bg-clinic-blue hover:bg-clinic-blue/90 text-white mt-2"
                       onClick={() => onEdit(selectedRecord)}
                       data-ocid="history.open_edit_button"
                     >
@@ -1217,7 +1312,7 @@ function PatientHistoryModal({
                     </div>
                     {/* Open & Edit even for blank records */}
                     <Button
-                      className="w-full gap-2 bg-clinic-teal hover:bg-clinic-teal/90 text-white"
+                      className="w-full gap-2 bg-clinic-blue hover:bg-clinic-blue/90 text-white"
                       onClick={() => onEdit(selectedRecord)}
                       data-ocid="history.open_edit_button"
                     >
@@ -1290,7 +1385,7 @@ function FollowUpDialog({
       <DialogContent className="max-w-md" data-ocid="followup.dialog">
         <DialogHeader>
           <DialogTitle className="font-display text-xl flex items-center gap-2">
-            <CalendarPlus className="w-5 h-5 text-clinic-teal" />
+            <CalendarPlus className="w-5 h-5 text-clinic-blue" />
             Schedule Follow-up
           </DialogTitle>
         </DialogHeader>
@@ -1299,7 +1394,7 @@ function FollowUpDialog({
           <div className="space-y-5 py-2">
             {/* Patient name */}
             <div className="flex items-center gap-3 p-3 bg-secondary/50 rounded-lg">
-              <div className="w-9 h-9 rounded-full bg-clinic-teal/20 flex items-center justify-center text-clinic-teal font-bold text-sm flex-shrink-0">
+              <div className="w-9 h-9 rounded-full bg-clinic-blue/20 flex items-center justify-center text-clinic-blue font-bold text-sm flex-shrink-0">
                 {patient.name.charAt(0).toUpperCase()}
               </div>
               <div>
@@ -1352,7 +1447,7 @@ function FollowUpDialog({
             Cancel
           </Button>
           <Button
-            className="gap-2 bg-clinic-teal hover:bg-clinic-teal/90 text-white"
+            className="gap-2 bg-clinic-red hover:bg-clinic-red/90 text-white"
             onClick={handleConfirm}
             data-ocid="followup.confirm_button"
           >
@@ -1559,9 +1654,9 @@ function PrescriptionPage({
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-center gap-3">
               <img
-                src="/assets/generated/logo-transparent.dim_400x400.png"
+                src="/assets/generated/logo-white-circle.dim_400x400.png"
                 alt="Shreeji Clinic"
-                className="w-12 h-12 object-contain"
+                className="w-12 h-12 object-cover rounded-full"
               />
               <div>
                 <h2 className="font-display text-2xl font-bold">
@@ -1656,7 +1751,7 @@ function PrescriptionPage({
                   <Button
                     size="sm"
                     variant="default"
-                    className="gap-1.5 bg-clinic-teal hover:bg-clinic-teal/90 text-white"
+                    className="gap-1.5 bg-clinic-blue hover:bg-clinic-blue/90 text-white"
                     onClick={handleAddPage}
                     data-ocid="prescription.add_page_button"
                   >
@@ -1708,9 +1803,9 @@ function PrescriptionPage({
               <div className="print-header-top">
                 <div className="print-header-brand">
                   <img
-                    src="/assets/generated/logo-transparent.dim_400x400.png"
+                    src="/assets/generated/logo-white-circle.dim_400x400.png"
                     alt="Shreeji Clinic"
-                    className="print-logo"
+                    className="print-logo rounded-full"
                   />
                   <div>
                     <h2 className="print-clinic-name">Shreeji Clinic</h2>
@@ -1770,7 +1865,7 @@ function PrescriptionPage({
 
         <div className="flex flex-wrap gap-2">
           <Button
-            className="gap-2 bg-green-600 hover:bg-green-700 text-white"
+            className="gap-2 bg-[#25D366] hover:bg-[#1ebe5d] text-white"
             onClick={() => {
               if (!currentPatient.contact) {
                 toast.error("No contact number available");
@@ -1798,7 +1893,7 @@ function PrescriptionPage({
             Print / PDF
           </Button>
           <Button
-            className="gap-2 bg-clinic-teal hover:bg-clinic-teal/90 text-white"
+            className="gap-2 bg-clinic-red hover:bg-clinic-red/90 text-white"
             onClick={handleSaveAll}
             data-ocid="prescription.save_button"
           >
@@ -2069,12 +2164,13 @@ function AppShell({
           href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="hover:text-clinic-teal transition-colors"
+          className="hover:text-clinic-blue transition-colors"
         >
           Built with ❤️ using caffeine.ai
         </a>
       </footer>
 
+      <PWAInstallBanner />
       <Toaster richColors position="top-right" />
     </div>
   );

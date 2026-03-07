@@ -79,8 +79,8 @@ export function LoginPage({ onLogin }: { onLogin: (s: AuthSession) => void }) {
     <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden">
       {/* Decorative background blobs */}
       <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
-        <div className="absolute top-0 left-0 w-[60vw] h-[60vw] max-w-[600px] max-h-[600px] rounded-full opacity-[0.07] -translate-x-1/2 -translate-y-1/2 bg-clinic-teal blur-3xl" />
-        <div className="absolute bottom-0 right-0 w-[50vw] h-[50vw] max-w-[500px] max-h-[500px] rounded-full opacity-[0.06] translate-x-1/3 translate-y-1/3 bg-clinic-blue blur-3xl" />
+        <div className="absolute top-0 left-0 w-[60vw] h-[60vw] max-w-[600px] max-h-[600px] rounded-full opacity-[0.08] -translate-x-1/2 -translate-y-1/2 bg-clinic-red blur-3xl" />
+        <div className="absolute bottom-0 right-0 w-[50vw] h-[50vw] max-w-[500px] max-h-[500px] rounded-full opacity-[0.07] translate-x-1/3 translate-y-1/3 bg-clinic-blue blur-3xl" />
         {/* Subtle grid pattern */}
         <div
           className="absolute inset-0 opacity-[0.03]"
@@ -109,9 +109,9 @@ export function LoginPage({ onLogin }: { onLogin: (s: AuthSession) => void }) {
               className="flex justify-center mb-4"
             >
               <img
-                src="/assets/generated/logo-transparent.dim_400x400.png"
+                src="/assets/generated/logo-white-circle.dim_400x400.png"
                 alt="Shreeji Clinic Logo"
-                className="w-20 h-20 object-contain drop-shadow-lg"
+                className="w-20 h-20 object-cover rounded-full drop-shadow-lg"
               />
             </motion.div>
             <motion.div
@@ -137,8 +137,8 @@ export function LoginPage({ onLogin }: { onLogin: (s: AuthSession) => void }) {
           >
             {/* Heading */}
             <div className="flex items-center gap-2 mb-6">
-              <div className="w-8 h-8 rounded-lg bg-clinic-teal/10 flex items-center justify-center">
-                <Stethoscope className="w-4 h-4 text-clinic-teal" />
+              <div className="w-8 h-8 rounded-lg bg-clinic-blue/10 flex items-center justify-center">
+                <Stethoscope className="w-4 h-4 text-clinic-blue" />
               </div>
               <h2 className="font-display text-xl font-bold text-foreground">
                 Doctor Login
@@ -236,7 +236,7 @@ export function LoginPage({ onLogin }: { onLogin: (s: AuthSession) => void }) {
               {/* Submit */}
               <Button
                 type="submit"
-                className="w-full h-11 gap-2 bg-clinic-teal hover:bg-clinic-teal/90 text-white font-semibold text-sm mt-1"
+                className="w-full h-11 gap-2 bg-clinic-red hover:bg-clinic-red/90 text-white font-semibold text-sm mt-1"
                 disabled={isSubmitting || !userId.trim() || !password}
                 data-ocid="login.submit_button"
               >
@@ -268,7 +268,7 @@ export function LoginPage({ onLogin }: { onLogin: (s: AuthSession) => void }) {
             href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="hover:text-clinic-teal transition-colors"
+            className="hover:text-clinic-blue transition-colors"
           >
             Built with ❤️ using caffeine.ai
           </a>

@@ -24,57 +24,64 @@
   :root {
     --radius: 0.5rem;
 
-    /* Medical Clean Light Theme — teal/sky blue palette */
-    --background: 0.98 0.004 220;
-    --foreground: 0.16 0.02 240;
+    /* Shreeji Clinic Brand — Red + Royal Blue palette from logo */
+    --background: 0.985 0.003 20;
+    --foreground: 0.15 0.025 255;
 
     --card: 1 0 0;
-    --card-foreground: 0.16 0.02 240;
+    --card-foreground: 0.15 0.025 255;
 
     --popover: 1 0 0;
-    --popover-foreground: 0.16 0.02 240;
+    --popover-foreground: 0.15 0.025 255;
 
-    /* Primary: deep medical teal */
-    --primary: 0.38 0.1 220;
+    /* Primary: brand royal blue */
+    --primary: 0.38 0.18 255;
     --primary-foreground: 0.98 0 0;
 
-    /* Secondary: soft sky */
-    --secondary: 0.92 0.03 220;
-    --secondary-foreground: 0.28 0.06 220;
+    /* Secondary: soft blue-tinted grey */
+    --secondary: 0.93 0.02 255;
+    --secondary-foreground: 0.28 0.08 255;
 
-    --muted: 0.94 0.015 220;
-    --muted-foreground: 0.48 0.04 220;
+    --muted: 0.94 0.01 20;
+    --muted-foreground: 0.50 0.04 255;
 
-    --accent: 0.88 0.06 220;
-    --accent-foreground: 0.22 0.08 220;
+    --accent: 0.90 0.04 255;
+    --accent-foreground: 0.22 0.12 255;
 
-    --destructive: 0.58 0.22 27;
+    --destructive: 0.55 0.24 27;
     --destructive-foreground: 0.98 0 0;
 
-    --border: 0.87 0.025 220;
-    --input: 0.9 0.02 220;
-    --ring: 0.5 0.12 220;
+    --border: 0.88 0.02 255;
+    --input: 0.91 0.015 255;
+    --ring: 0.48 0.18 255;
 
-    /* Clinical teal accent */
-    --clinic-teal: 0.52 0.14 210;
-    --clinic-teal-light: 0.92 0.05 210;
-    --clinic-blue: 0.44 0.16 255;
-    --clinic-sky: 0.72 0.1 215;
+    /* Brand colors extracted from logo */
+    /* clinic-red: bold tomato-red of the figure/cross */
+    --clinic-red: 0.58 0.24 27;
+    --clinic-red-light: 0.92 0.06 27;
+    /* clinic-blue: royal blue of the cross arm and text */
+    --clinic-blue: 0.40 0.20 255;
+    --clinic-blue-light: 0.90 0.06 255;
 
-    --chart-1: 0.52 0.14 210;
-    --chart-2: 0.6 0.12 184;
-    --chart-3: 0.4 0.07 227;
+    /* Keep teal as alias of blue for backward compat */
+    --clinic-teal: 0.40 0.20 255;
+    --clinic-teal-light: 0.90 0.06 255;
+    --clinic-sky: 0.65 0.12 255;
+
+    --chart-1: 0.58 0.24 27;
+    --chart-2: 0.40 0.20 255;
+    --chart-3: 0.52 0.16 255;
     --chart-4: 0.72 0.16 84;
-    --chart-5: 0.65 0.2 27;
+    --chart-5: 0.65 0.20 27;
 
-    --sidebar: 0.96 0.018 220;
-    --sidebar-foreground: 0.16 0.02 240;
-    --sidebar-primary: 0.38 0.1 220;
+    --sidebar: 0.96 0.015 255;
+    --sidebar-foreground: 0.15 0.025 255;
+    --sidebar-primary: 0.38 0.18 255;
     --sidebar-primary-foreground: 0.98 0 0;
-    --sidebar-accent: 0.9 0.035 220;
-    --sidebar-accent-foreground: 0.22 0.08 220;
-    --sidebar-border: 0.87 0.025 220;
-    --sidebar-ring: 0.5 0.12 220;
+    --sidebar-accent: 0.91 0.03 255;
+    --sidebar-accent-foreground: 0.22 0.12 255;
+    --sidebar-border: 0.88 0.02 255;
+    --sidebar-ring: 0.48 0.18 255;
   }
 
   * {
@@ -155,8 +162,9 @@
     break-after: avoid;
   }
 
+  /* Brand gradient: royal blue left → red right (logo colors) */
   .print-header {
-    background: linear-gradient(135deg, oklch(0.35 0.1 220), oklch(0.48 0.14 210));
+    background: linear-gradient(135deg, oklch(0.32 0.20 255) 0%, oklch(0.48 0.22 27) 100%);
     color: white;
     padding: 8mm 8mm 5mm;
     -webkit-print-color-adjust: exact;
@@ -227,7 +235,7 @@
   }
 
   .print-patient-field {
-    background: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.15);
     border-radius: 3mm;
     padding: 1.5mm 3mm;
     min-width: 22mm;
@@ -237,7 +245,7 @@
   }
 
   .print-followup-field {
-    background: rgba(250, 204, 21, 0.3);
+    background: rgba(250, 204, 21, 0.35);
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
@@ -282,11 +290,12 @@
 }
 
 @layer utilities {
+  /* Brand gradient: royal blue → brand red (logo colors) */
   .clinic-header-gradient {
     background: linear-gradient(
       135deg,
-      oklch(0.35 0.1 220) 0%,
-      oklch(0.48 0.14 210) 100%
+      oklch(0.32 0.20 255) 0%,
+      oklch(0.50 0.22 27) 100%
     );
   }
 
