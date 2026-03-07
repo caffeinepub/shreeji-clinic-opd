@@ -1,0 +1,303 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Fonts ── */
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  src: url("/assets/fonts/PlusJakartaSans-VariableFont_wght.woff2")
+    format("woff2");
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Fraunces";
+  src: url("/assets/fonts/Fraunces-VariableFont_SOFT,WONK,opsz,wght.woff2")
+    format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@layer base {
+  :root {
+    --radius: 0.5rem;
+
+    /* Medical Clean Light Theme — teal/sky blue palette */
+    --background: 0.98 0.004 220;
+    --foreground: 0.16 0.02 240;
+
+    --card: 1 0 0;
+    --card-foreground: 0.16 0.02 240;
+
+    --popover: 1 0 0;
+    --popover-foreground: 0.16 0.02 240;
+
+    /* Primary: deep medical teal */
+    --primary: 0.38 0.1 220;
+    --primary-foreground: 0.98 0 0;
+
+    /* Secondary: soft sky */
+    --secondary: 0.92 0.03 220;
+    --secondary-foreground: 0.28 0.06 220;
+
+    --muted: 0.94 0.015 220;
+    --muted-foreground: 0.48 0.04 220;
+
+    --accent: 0.88 0.06 220;
+    --accent-foreground: 0.22 0.08 220;
+
+    --destructive: 0.58 0.22 27;
+    --destructive-foreground: 0.98 0 0;
+
+    --border: 0.87 0.025 220;
+    --input: 0.9 0.02 220;
+    --ring: 0.5 0.12 220;
+
+    /* Clinical teal accent */
+    --clinic-teal: 0.52 0.14 210;
+    --clinic-teal-light: 0.92 0.05 210;
+    --clinic-blue: 0.44 0.16 255;
+    --clinic-sky: 0.72 0.1 215;
+
+    --chart-1: 0.52 0.14 210;
+    --chart-2: 0.6 0.12 184;
+    --chart-3: 0.4 0.07 227;
+    --chart-4: 0.72 0.16 84;
+    --chart-5: 0.65 0.2 27;
+
+    --sidebar: 0.96 0.018 220;
+    --sidebar-foreground: 0.16 0.02 240;
+    --sidebar-primary: 0.38 0.1 220;
+    --sidebar-primary-foreground: 0.98 0 0;
+    --sidebar-accent: 0.9 0.035 220;
+    --sidebar-accent-foreground: 0.22 0.08 220;
+    --sidebar-border: 0.87 0.025 220;
+    --sidebar-ring: 0.5 0.12 220;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display;
+  }
+}
+
+/* ── Print-Only Multi-Page Container (hidden on screen) ── */
+.print-only-pages {
+  display: none;
+}
+
+/* ── Print Styles ── */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  /* Hide on-screen prescription paper when printing multi-page layout */
+  .prescription-paper {
+    display: none !important;
+  }
+
+  /* Show print-only pages */
+  .print-only-pages {
+    display: block !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  canvas {
+    max-width: 100% !important;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* ── A4 Print Page ── */
+  .print-page {
+    width: 210mm;
+    min-height: 277mm;
+    background: white;
+    box-sizing: border-box;
+    page-break-after: always;
+    break-after: page;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #ddd;
+  }
+
+  .print-page:last-child {
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+
+  .print-header {
+    background: linear-gradient(135deg, oklch(0.35 0.1 220), oklch(0.48 0.14 210));
+    color: white;
+    padding: 8mm 8mm 5mm;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .print-header-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8mm;
+    margin-bottom: 4mm;
+  }
+
+  .print-header-brand {
+    display: flex;
+    align-items: center;
+    gap: 4mm;
+  }
+
+  .print-logo {
+    width: 14mm;
+    height: 14mm;
+    object-fit: contain;
+  }
+
+  .print-clinic-name {
+    font-size: 16pt;
+    font-weight: 700;
+    margin: 0;
+    color: white;
+    line-height: 1.2;
+  }
+
+  .print-clinic-sub {
+    font-size: 8pt;
+    color: rgba(255, 255, 255, 0.8);
+    margin: 1mm 0 0;
+  }
+
+  .print-header-right {
+    text-align: right;
+  }
+
+  .print-doctor {
+    font-size: 9pt;
+    font-weight: 600;
+    color: white;
+    margin: 0;
+  }
+
+  .print-date {
+    font-size: 8pt;
+    color: rgba(255, 255, 255, 0.75);
+    margin: 1mm 0 0;
+  }
+
+  .print-page-num {
+    font-size: 7pt;
+    color: rgba(255, 255, 255, 0.65);
+    margin: 0.5mm 0 0;
+  }
+
+  .print-patient-band {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2mm;
+  }
+
+  .print-patient-field {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 3mm;
+    padding: 1.5mm 3mm;
+    min-width: 22mm;
+    flex: 1;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .print-followup-field {
+    background: rgba(250, 204, 21, 0.3);
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .print-field-label {
+    display: block;
+    font-size: 6pt;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: rgba(255, 255, 255, 0.65);
+    margin-bottom: 0.5mm;
+  }
+
+  .print-field-value {
+    display: block;
+    font-size: 8pt;
+    font-weight: 600;
+    color: white;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .print-canvas-area {
+    flex: 1;
+    padding: 5mm;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .print-canvas-img {
+    width: 100%;
+    height: auto;
+    display: block;
+    object-fit: contain;
+  }
+
+  .print-canvas-blank {
+    flex: 1;
+    min-height: 200mm;
+  }
+}
+
+@layer utilities {
+  .clinic-header-gradient {
+    background: linear-gradient(
+      135deg,
+      oklch(0.35 0.1 220) 0%,
+      oklch(0.48 0.14 210) 100%
+    );
+  }
+
+  .canvas-container {
+    touch-action: none;
+  }
+
+  .prescription-paper {
+    background: white;
+    box-shadow:
+      0 4px 6px -1px rgba(0, 0, 0, 0.05),
+      0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  }
+}
