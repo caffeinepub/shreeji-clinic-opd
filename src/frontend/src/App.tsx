@@ -1073,11 +1073,13 @@ function PatientHistoryModal({
   patientName,
   open,
   onClose,
+  onEdit,
 }: {
   uid: string;
   patientName: string;
   open: boolean;
   onClose: () => void;
+  onEdit: (record: PrescriptionRecord) => void;
 }) {
   const [selectedRecord, setSelectedRecord] =
     useState<PrescriptionRecord | null>(null);
@@ -1198,10 +1200,30 @@ function PatientHistoryModal({
                         )}
                       </div>
                     ))}
+                    {/* Open & Edit button */}
+                    <Button
+                      className="w-full gap-2 bg-clinic-teal hover:bg-clinic-teal/90 text-white mt-2"
+                      onClick={() => onEdit(selectedRecord)}
+                      data-ocid="history.open_edit_button"
+                    >
+                      <PenLine className="w-4 h-4" />
+                      Open &amp; Edit
+                    </Button>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center h-48 bg-secondary rounded-lg text-muted-foreground text-sm">
-                    No canvas data for this record
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-center h-48 bg-secondary rounded-lg text-muted-foreground text-sm">
+                      No canvas data for this record
+                    </div>
+                    {/* Open & Edit even for blank records */}
+                    <Button
+                      className="w-full gap-2 bg-clinic-teal hover:bg-clinic-teal/90 text-white"
+                      onClick={() => onEdit(selectedRecord)}
+                      data-ocid="history.open_edit_button"
+                    >
+                      <PenLine className="w-4 h-4" />
+                      Open &amp; Edit
+                    </Button>
                   </div>
                 )}
               </div>
@@ -1350,11 +1372,13 @@ function PrescriptionPage({
   onBack,
   onUpdate,
   followUpDate,
+  initialPages,
 }: {
   patient: LocalPatient;
   onBack: () => void;
   onUpdate: (p: LocalPatient) => void;
   followUpDate?: string;
+  initialPages?: string[];
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [currentPatient, setCurrentPatient] = useState<LocalPatient>(patient);
@@ -1363,6 +1387,7 @@ function PrescriptionPage({
   // ── Multi-page state ──────────────────────────────────────────────────────
   // pages: array of base64 dataURLs (empty string = blank page)
   const [pages, setPages] = useState<string[]>(() => {
+    if (initialPages && initialPages.length > 0) return initialPages;
     // Follow-up always starts fresh; otherwise load existing canvasData as page 0
     if (followUpDate) return [""];
     if (patient.canvasData) return [patient.canvasData];
@@ -1392,7 +1417,11 @@ function PrescriptionPage({
   // Initialize canvas on mount — only run once with page 0
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentional mount-only init
   useEffect(() => {
-    loadPageIntoCanvas(pages[0] ?? "");
+    const startPage =
+      initialPages && initialPages.length > 0
+        ? (initialPages[0] ?? "")
+        : (pages[0] ?? "");
+    loadPageIntoCanvas(startPage);
   }, [loadPageIntoCanvas]);
 
   // pendingPageLoad: when set, load this data into canvas after next render
@@ -1835,6 +1864,9 @@ function AppShell({
   const [followUpDate, setFollowUpDate] = useState<string | undefined>(
     undefined,
   );
+  const [editFromHistoryPages, setEditFromHistoryPages] = useState<
+    string[] | undefined
+  >(undefined);
   const [localPatients, setLocalPatients] = useState<LocalPatient[]>(
     loadLocalPatients(),
   );
@@ -1977,9 +2009,11 @@ function AppShell({
             onBack={() => {
               setPage("dashboard");
               setFollowUpDate(undefined);
+              setEditFromHistoryPages(undefined);
             }}
             onUpdate={handlePatientUpdate}
             followUpDate={followUpDate}
+            initialPages={editFromHistoryPages}
           />
         )}
       </main>
@@ -1989,6 +2023,20 @@ function AppShell({
         patientName={historyPatient?.name ?? ""}
         open={!!historyPatient}
         onClose={() => setHistoryPatient(null)}
+        onEdit={(record) => {
+          if (!historyPatient) return;
+          const pages =
+            record.pages && record.pages.length > 0
+              ? record.pages
+              : record.canvasData
+                ? [record.canvasData]
+                : [];
+          setEditFromHistoryPages(pages);
+          setFollowUpDate(record.followUpDate ?? undefined);
+          setSelectedPatient(historyPatient);
+          setHistoryPatient(null);
+          setPage("prescription");
+        }}
       />
 
       <FollowUpDialog
