@@ -1054,16 +1054,17 @@ function DrawingCanvas({
         </div>
       </div>
 
-      {/* Canvas */}
+      {/* Canvas — A4 aspect ratio (794 × 1123 px @ 96 dpi) */}
       <div className="border border-border rounded-lg overflow-hidden bg-white">
         <canvas
           ref={canvasRef}
-          width={1200}
-          height={600}
+          width={794}
+          height={1123}
           className="w-full"
           style={{
             touchAction: "none",
             cursor: tool === "eraser" ? "cell" : "crosshair",
+            aspectRatio: "794 / 1123",
           }}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
@@ -1646,8 +1647,8 @@ function PrescriptionPage({
   ];
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-4">
-      {/* Prescription Paper — on-screen interactive view */}
+    <div className="max-w-3xl mx-auto px-4 py-4">
+      {/* Prescription Paper — on-screen interactive view (A4-like width) */}
       <div className="prescription-paper rounded-xl border border-border overflow-hidden">
         {/* Prescription Header */}
         <div className="clinic-header-gradient text-white p-5">
