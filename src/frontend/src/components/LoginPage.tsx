@@ -7,14 +7,44 @@ import { useState } from "react";
 
 // ── Credentials ──────────────────────────────────────────────────────────────
 
-const DOCTOR_ACCOUNTS = [
+export interface DoctorAccount {
+  userId: string;
+  password: string;
+  displayName: string;
+}
+
+const DEFAULT_DOCTOR_ACCOUNTS: DoctorAccount[] = [
   {
     userId: "dr.dhravid",
     password: "dhravid@123",
-    displayName: "Dr. Dhravid",
+    displayName: "Dr. Dhravid Patel",
   },
-  { userId: "dr.zeel", password: "zeel@123", displayName: "Dr. Zeel" },
-] as const;
+  { userId: "dr.zeel", password: "zeel@123", displayName: "Dr. Zeel Patel" },
+];
+
+const ACCOUNTS_KEY = "shreeji_doctor_accounts";
+
+export function getAccounts(): DoctorAccount[] {
+  try {
+    const raw = localStorage.getItem(ACCOUNTS_KEY);
+    if (!raw) {
+      saveAccounts(DEFAULT_DOCTOR_ACCOUNTS);
+      return DEFAULT_DOCTOR_ACCOUNTS;
+    }
+    const parsed = JSON.parse(raw) as DoctorAccount[];
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      saveAccounts(DEFAULT_DOCTOR_ACCOUNTS);
+      return DEFAULT_DOCTOR_ACCOUNTS;
+    }
+    return parsed;
+  } catch {
+    return DEFAULT_DOCTOR_ACCOUNTS;
+  }
+}
+
+export function saveAccounts(accounts: DoctorAccount[]): void {
+  localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
+}
 
 export interface AuthSession {
   userId: string;
@@ -56,7 +86,8 @@ export function LoginPage({ onLogin }: { onLogin: (s: AuthSession) => void }) {
 
     // Simulate a brief authentication check
     setTimeout(() => {
-      const account = DOCTOR_ACCOUNTS.find(
+      const accounts = getAccounts();
+      const account = accounts.find(
         (a) =>
           a.userId === userId.trim().toLowerCase() && a.password === password,
       );

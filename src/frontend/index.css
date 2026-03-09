@@ -287,6 +287,13 @@
     flex: 1;
     min-height: 210mm;
   }
+
+  .print-image-label {
+    font-size: 10pt;
+    color: #555;
+    margin-bottom: 4mm;
+    font-weight: 600;
+  }
 }
 
 @layer utilities {
