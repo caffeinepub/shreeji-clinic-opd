@@ -1,0 +1,45 @@
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Shreeji Clinic OPD</title>
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Theme color for Android Chrome -->
+    <meta name="theme-color" content="#1e40af" />
+    <meta name="background-color" content="#ffffff" />
+
+    <!-- PWA meta tags -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Shreeji OPD" />
+
+    <!-- App icons -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/assets/generated/pwa-icon-192x192.dim_192x192.png" />
+    <link rel="apple-touch-icon" href="/assets/generated/pwa-icon-192x192.dim_192x192.png" />
+
+    <!-- Description -->
+    <meta name="description" content="Shreeji Clinic OPD Prescription Management" />
+
+    <!-- Prevent phone number detection -->
+    <meta name="format-detection" content="telephone=no" />
+    <script type="module" crossorigin src="/assets/index-D1p5Doit.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-CIYulyc1.css">
+  </head>
+  <body>
+    <div id="root"></div>
+    <!-- Register Service Worker for PWA -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('/sw.js').catch(function() {
+            // Service worker registration failed silently
+          });
+        });
+      }
+    </script>
+  </body>
+</html>

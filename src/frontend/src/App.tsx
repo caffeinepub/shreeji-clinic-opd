@@ -59,6 +59,7 @@ import {
   Menu,
   MessageSquare,
   PenLine,
+  Pencil,
   Pill,
   Plus,
   Printer,
@@ -250,6 +251,7 @@ interface Bill {
   taxableAmount: number;
   gstAmount: number;
   grandTotal: number;
+  status?: "pending" | "done";
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -810,6 +812,156 @@ function FrontDeskPage({
   );
 }
 
+// ── Edit Patient Dialog ────────────────────────────────────────────────────
+
+function EditPatientDialog({
+  patient,
+  open,
+  onClose,
+  onSave,
+}: {
+  patient: LocalPatient | null;
+  open: boolean;
+  onClose: () => void;
+  onSave: (updated: LocalPatient) => void;
+}) {
+  const [name, setName] = useState("");
+  const [age, setAge] = useState("");
+  const [sex, setSex] = useState("");
+  const [contact, setContact] = useState("");
+  const [doctorName, setDoctorName] = useState("");
+
+  useEffect(() => {
+    if (patient) {
+      setName(patient.name);
+      setAge(String(patient.age));
+      setSex(patient.sex);
+      setContact(patient.contact);
+      setDoctorName(patient.doctorName);
+    }
+  }, [patient]);
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!patient) return;
+    if (!name.trim() || !age || !sex || !doctorName) {
+      toast.error("Please fill all required fields");
+      return;
+    }
+    onSave({
+      ...patient,
+      name: name.trim(),
+      age: Number(age),
+      sex,
+      contact: contact.trim(),
+      doctorName,
+    });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md" data-ocid="edit_patient.dialog">
+        <DialogHeader>
+          <DialogTitle>Edit Patient Details</DialogTitle>
+        </DialogHeader>
+        {patient && (
+          <form onSubmit={handleSubmit} className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>UID (Read-only)</Label>
+              <Input
+                value={patient.uid}
+                disabled
+                className="font-mono text-sm bg-secondary"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="ep-name">Full Name *</Label>
+              <Input
+                id="ep-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Patient name"
+                required
+                data-ocid="edit_patient.name_input"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="ep-age">Age *</Label>
+                <Input
+                  id="ep-age"
+                  type="number"
+                  min="0"
+                  max="150"
+                  value={age}
+                  onChange={(e) => setAge(e.target.value)}
+                  placeholder="Age"
+                  required
+                  data-ocid="edit_patient.age_input"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Sex *</Label>
+                <Select value={sex} onValueChange={setSex}>
+                  <SelectTrigger data-ocid="edit_patient.sex_select">
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Male">Male</SelectItem>
+                    <SelectItem value="Female">Female</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="ep-contact">Contact</Label>
+              <Input
+                id="ep-contact"
+                value={contact}
+                onChange={(e) => setContact(e.target.value)}
+                placeholder="Phone number"
+                data-ocid="edit_patient.contact_input"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Doctor *</Label>
+              <Select value={doctorName} onValueChange={setDoctorName}>
+                <SelectTrigger data-ocid="edit_patient.doctor_select">
+                  <SelectValue placeholder="Select doctor" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Dr. Dhravid Patel">
+                    Dr. Dhravid Patel
+                  </SelectItem>
+                  <SelectItem value="Dr. Zeel Patel">Dr. Zeel Patel</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                data-ocid="edit_patient.cancel_button"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="bg-clinic-red hover:bg-clinic-red/90 text-white"
+                data-ocid="edit_patient.save_button"
+              >
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Dashboard ──────────────────────────────────────────────────────────────
 
 function DashboardPage({
@@ -821,6 +973,7 @@ function DashboardPage({
   onViewHistory,
   onFollowUp,
   onBill,
+  onEditPatient,
 }: {
   patients: LocalPatient[];
   isLoading: boolean;
@@ -830,6 +983,7 @@ function DashboardPage({
   onViewHistory: (p: LocalPatient) => void;
   onFollowUp: (p: LocalPatient) => void;
   onBill: (p: LocalPatient) => void;
+  onEditPatient: (p: LocalPatient) => void;
 }) {
   const [search, setSearch] = useState("");
 
@@ -996,6 +1150,16 @@ function DashboardPage({
                       >
                         <CalendarPlus className="w-3.5 h-3.5" />
                         Follow-up
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-clinic-blue hover:text-clinic-blue hover:bg-clinic-blue/10 w-8 h-8 p-0"
+                        onClick={() => onEditPatient(patient)}
+                        title="Edit patient"
+                        data-ocid={`dashboard.patient.edit_button.${idx + 1}`}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
                       </Button>
                       <Button
                         size="sm"
@@ -1668,16 +1832,15 @@ function ImageUploadPanel({
         data-ocid="prescription.dropzone"
       >
         <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-        <p className="font-medium text-sm">Upload from Camera or Gallery</p>
+        <p className="font-medium text-sm">Upload Image or PDF from Gallery</p>
         <p className="text-xs text-muted-foreground mt-1">
-          Click to browse or take a photo
+          Tap to browse photos or PDF files
         </p>
         <input
           id="image-upload-input"
           ref={fileInputRef}
           type="file"
-          accept="image/*"
-          capture="environment"
+          accept="image/*,application/pdf"
           multiple
           className="hidden"
           onChange={handleFileChange}
@@ -1692,11 +1855,20 @@ function ImageUploadPanel({
               key={`img-${idx}-${img.slice(22, 30)}`}
               className="relative group rounded-lg overflow-hidden border border-border aspect-square"
             >
-              <img
-                src={img}
-                alt={`Upload ${idx + 1}`}
-                className="w-full h-full object-cover"
-              />
+              {img.startsWith("data:application/pdf") ? (
+                <div className="w-full h-full flex flex-col items-center justify-center bg-secondary p-2 text-center">
+                  <FileText className="w-8 h-8 text-clinic-red mb-1" />
+                  <p className="text-xs text-muted-foreground truncate w-full text-center">
+                    PDF File
+                  </p>
+                </div>
+              ) : (
+                <img
+                  src={img}
+                  alt={`Upload ${idx + 1}`}
+                  className="w-full h-full object-cover"
+                />
+              )}
               <button
                 type="button"
                 className="absolute top-1 right-1 w-6 h-6 rounded-full bg-destructive text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
@@ -3518,6 +3690,7 @@ function BillingDialog({
       discountType,
       gstPercent,
       ...totals,
+      status: "pending" as const,
     };
   }
 
@@ -4164,6 +4337,33 @@ function BillingDialog({
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className={`gap-1 text-xs ${bill.status === "done" ? "border-emerald-400 text-emerald-700 hover:bg-emerald-50" : "border-amber-400 text-amber-700 hover:bg-amber-50"}`}
+                          onClick={() => {
+                            const existing = loadBills(uid);
+                            const updated = existing.map((b) =>
+                              b.billId === bill.billId
+                                ? {
+                                    ...b,
+                                    status:
+                                      b.status === "done"
+                                        ? ("pending" as const)
+                                        : ("done" as const),
+                                  }
+                                : b,
+                            );
+                            saveBills(uid, updated);
+                            setPastBills(updated.slice().reverse());
+                            toast.success(
+                              `Bill marked as ${bill.status === "done" ? "Pending" : "Done"}`,
+                            );
+                          }}
+                          data-ocid={`billing.past_bill.toggle.${idx + 1}`}
+                        >
+                          {bill.status === "done" ? "✓ Done" : "⏳ Pending"}
+                        </Button>
                       </div>
                     </div>
                     {bill.items.length > 0 && (
@@ -4570,6 +4770,7 @@ function AppShell({
   const [billingPatient, setBillingPatient] = useState<LocalPatient | null>(
     null,
   );
+  const [editPatient, setEditPatient] = useState<LocalPatient | null>(null);
   const { actor, isFetching } = useActor();
   const queryClient = useQueryClient();
 
@@ -5042,6 +5243,7 @@ function AppShell({
               setFollowUpDialogOpen(true);
             }}
             onBill={(p) => setBillingPatient(p)}
+            onEditPatient={(p) => setEditPatient(p)}
           />
         )}
 
@@ -5126,6 +5328,17 @@ function AppShell({
         patient={billingPatient}
         open={!!billingPatient}
         onClose={() => setBillingPatient(null)}
+      />
+
+      <EditPatientDialog
+        patient={editPatient}
+        open={!!editPatient}
+        onClose={() => setEditPatient(null)}
+        onSave={(updated) => {
+          updateMutation.mutate(updated);
+          setEditPatient(null);
+          toast.success("Patient updated successfully");
+        }}
       />
 
       {/* Footer */}
