@@ -41,6 +41,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useActor } from "@/hooks/useActor";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  Award,
   CalendarPlus,
   ChevronDown,
   ChevronLeft,
@@ -973,6 +974,7 @@ function DashboardPage({
   onViewHistory,
   onFollowUp,
   onBill,
+  onCertificate,
   onEditPatient,
 }: {
   patients: LocalPatient[];
@@ -983,6 +985,7 @@ function DashboardPage({
   onViewHistory: (p: LocalPatient) => void;
   onFollowUp: (p: LocalPatient) => void;
   onBill: (p: LocalPatient) => void;
+  onCertificate: (p: LocalPatient) => void;
   onEditPatient: (p: LocalPatient) => void;
 }) {
   const [search, setSearch] = useState("");
@@ -1150,6 +1153,16 @@ function DashboardPage({
                       >
                         <CalendarPlus className="w-3.5 h-3.5" />
                         Follow-up
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5 text-xs text-violet-700 border-violet-300 hover:bg-violet-50 hover:text-violet-800"
+                        onClick={() => onCertificate(patient)}
+                        data-ocid={`dashboard.certificate_button.${idx + 1}`}
+                      >
+                        <Award className="w-3.5 h-3.5" />
+                        Certificate
                       </Button>
                       <Button
                         size="sm"
@@ -1755,10 +1768,7 @@ function DrawingCanvas({
       </div>
 
       {/* Canvas — A4 aspect ratio (794 × 1123 px @ 96 dpi) */}
-      <div
-        className="border border-border rounded-lg bg-white overflow-auto"
-        style={{ maxHeight: "600px" }}
-      >
+      <div className="border border-border rounded-lg bg-white overflow-hidden">
         <div
           style={{
             width: `${794 * clampedZoom}px`,
@@ -3362,6 +3372,24 @@ async function generateBillPDF(
     /* skip */
   }
 
+  // Load stamp for bill
+  const billStampFile =
+    patient.doctorName === "Dr. Dhravid Patel"
+      ? "/assets/generated/stamp-dhravid-transparent.dim_300x120.png"
+      : "/assets/generated/stamp-zeel-transparent.dim_300x120.png";
+  let billStampBase64 = "";
+  try {
+    const billStampResp = await fetch(billStampFile);
+    const billStampBlob = await billStampResp.blob();
+    billStampBase64 = await new Promise<string>((res) => {
+      const reader = new FileReader();
+      reader.onload = () => res(reader.result as string);
+      reader.readAsDataURL(billStampBlob);
+    });
+  } catch {
+    /* skip */
+  }
+
   const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
   // ── Header band ──────────────────────────────────────────────
@@ -3579,6 +3607,34 @@ async function generateBillPDF(
   }
   drawTotalRow("Grand Total", `Rs.${bill.grandTotal.toFixed(2)}`, true);
 
+  // ── Attending Doctor stamp & name ──────────────────────────────
+  const attendingY = y + 8;
+  pdf.setFontSize(9);
+  pdf.setFont("helvetica", "normal");
+  pdf.setTextColor(80, 80, 80);
+  pdf.text("Attending Doctor:", MARGIN, attendingY + 4);
+  pdf.setFont("helvetica", "bold");
+  pdf.setTextColor(26, 58, 138);
+  pdf.text(patient.doctorName, MARGIN + 35, attendingY + 4);
+  const billDocCreds2 = getDoctorCredentials(patient.doctorName);
+  if (billDocCreds2) {
+    pdf.setFontSize(7.5);
+    pdf.setFont("helvetica", "normal");
+    pdf.setTextColor(80, 80, 80);
+    pdf.text(billDocCreds2, MARGIN + 35, attendingY + 10);
+  }
+  if (billStampBase64) {
+    try {
+      const STAMP_W = 50;
+      const STAMP_H = 20;
+      const stampX = A4_W - MARGIN - STAMP_W;
+      const stampY = attendingY - 2;
+      pdf.addImage(billStampBase64, "PNG", stampX, stampY, STAMP_W, STAMP_H);
+    } catch {
+      /* skip */
+    }
+  }
+
   // ── Footer ─────────────────────────────────────────────────────
   const footerY = A4_H - 18;
   pdf.setFillColor(26, 58, 138);
@@ -3599,6 +3655,462 @@ async function generateBillPDF(
   const safeName = patient.name.replace(/[^a-zA-Z0-9]/g, "_");
   const safeDate = bill.date.replace(/-/g, "");
   pdf.save(`Bill_${safeName}_${bill.billId}_${safeDate}.pdf`);
+}
+
+// ── Certificate PDF Generator ──────────────────────────────────────────────
+
+async function generateCertificatePDF(
+  patient: LocalPatient,
+  certType: "rest" | "fitness",
+  fields: {
+    diagnosis?: string;
+    restFrom?: string;
+    restTo?: string;
+    examinedOn?: string;
+    purpose?: string;
+    remarks?: string;
+    doctorName: string;
+  },
+): Promise<void> {
+  const jsPDF = await loadJsPDF();
+
+  const A4_W = 210;
+  const A4_H = 297;
+  const MARGIN = 14;
+
+  // Load logo
+  let logoBase64 = "";
+  try {
+    const resp = await fetch(
+      "/assets/generated/logo-white-circle.dim_400x400.png",
+    );
+    const blob = await resp.blob();
+    logoBase64 = await new Promise<string>((res) => {
+      const reader = new FileReader();
+      reader.onload = () => res(reader.result as string);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    /* skip */
+  }
+
+  // Load stamp
+  const stampFile =
+    fields.doctorName === "Dr. Dhravid Patel"
+      ? "/assets/generated/stamp-dhravid-transparent.dim_300x120.png"
+      : "/assets/generated/stamp-zeel-transparent.dim_300x120.png";
+  let stampBase64 = "";
+  try {
+    const stampResp = await fetch(stampFile);
+    const stampBlob = await stampResp.blob();
+    stampBase64 = await new Promise<string>((res) => {
+      const reader = new FileReader();
+      reader.onload = () => res(reader.result as string);
+      reader.readAsDataURL(stampBlob);
+    });
+  } catch {
+    /* skip */
+  }
+
+  const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+
+  // ── Header band ──────────────────────────────────────────────
+  const LOGO_SIZE = 22;
+  const HEADER_H = 36;
+  pdf.setFillColor(26, 58, 138);
+  pdf.rect(0, 0, A4_W, HEADER_H, "F");
+  pdf.setFillColor(192, 57, 43);
+  pdf.rect(A4_W * 0.6, 0, A4_W * 0.4, HEADER_H, "F");
+
+  if (logoBase64) {
+    try {
+      pdf.addImage(logoBase64, "PNG", MARGIN, 7, LOGO_SIZE, LOGO_SIZE);
+    } catch {
+      /* skip */
+    }
+  }
+
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFontSize(16);
+  pdf.setFont("helvetica", "bold");
+  pdf.text("Shreeji Clinic", MARGIN + LOGO_SIZE + 4, 16);
+  pdf.setFontSize(8);
+  pdf.setFont("helvetica", "normal");
+  pdf.text("OPD — Medical Certificate", MARGIN + LOGO_SIZE + 4, 23);
+
+  const doctorCreds = getDoctorCredentials(fields.doctorName);
+  pdf.setFontSize(10);
+  pdf.setFont("helvetica", "bold");
+  pdf.setTextColor(255, 255, 255);
+  pdf.text(fields.doctorName, A4_W - MARGIN, 14, { align: "right" });
+  if (doctorCreds) {
+    pdf.setFontSize(7.5);
+    pdf.setFont("helvetica", "normal");
+    pdf.setTextColor(220, 230, 255);
+    pdf.text(doctorCreds, A4_W - MARGIN, 21, { align: "right" });
+    pdf.setTextColor(255, 255, 255);
+  }
+  const todayLabel = new Date()
+    .toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    })
+    .replace(/\//g, "/");
+  pdf.setFontSize(7.5);
+  pdf.setFont("helvetica", "normal");
+  pdf.setTextColor(220, 220, 255);
+  pdf.text(todayLabel, A4_W - MARGIN, 29, { align: "right" });
+
+  // ── Patient info band ─────────────────────────────────────────
+  const bandY = HEADER_H;
+  const CONTENT_W = A4_W - MARGIN * 2;
+  pdf.setFillColor(15, 40, 100);
+  pdf.rect(0, bandY, A4_W, 18, "F");
+
+  const ptFields = [
+    { label: "UID", value: patient.uid },
+    { label: "Name", value: patient.name },
+    { label: "Age/Sex", value: `${patient.age}y / ${patient.sex}` },
+    { label: "Contact", value: patient.contact || "—" },
+    { label: "Date", value: todayLabel },
+  ];
+  const cellW = CONTENT_W / ptFields.length;
+  ptFields.forEach((f, i) => {
+    const cx = MARGIN + i * cellW + cellW / 2;
+    pdf.setFontSize(6);
+    pdf.setFont("helvetica", "normal");
+    pdf.setTextColor(180, 200, 255);
+    pdf.text(f.label.toUpperCase(), cx, bandY + 5, { align: "center" });
+    pdf.setFontSize(7);
+    pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(255, 255, 255);
+    const maxChars = Math.floor(cellW / 1.8);
+    const val =
+      f.value.length > maxChars ? `${f.value.slice(0, maxChars)}…` : f.value;
+    pdf.text(val, cx, bandY + 11, { align: "center" });
+  });
+
+  // ── Certificate Title ─────────────────────────────────────────
+  let yPos = bandY + 18 + 18;
+  pdf.setFontSize(20);
+  pdf.setFont("helvetica", "bold");
+  pdf.setTextColor(26, 58, 138);
+  const title =
+    certType === "rest" ? "REST CERTIFICATE" : "FITNESS CERTIFICATE";
+  pdf.text(title, A4_W / 2, yPos, { align: "center" });
+
+  // Underline
+  yPos += 3;
+  pdf.setFillColor(192, 57, 43);
+  pdf.rect(MARGIN + 20, yPos, CONTENT_W - 40, 1, "F");
+
+  // ── Certificate Body ──────────────────────────────────────────
+  yPos += 12;
+  pdf.setFontSize(11);
+  pdf.setFont("helvetica", "normal");
+  pdf.setTextColor(30, 30, 30);
+
+  const formatDateDisplay = (d: string) => {
+    if (!d) return "";
+    const [y, m, day] = d.split("-");
+    return `${day}/${m}/${y}`;
+  };
+
+  let bodyLines: string[] = [];
+  if (certType === "rest") {
+    const diagnosis = fields.diagnosis || "illness";
+    const from = fields.restFrom ? formatDateDisplay(fields.restFrom) : "—";
+    const to = fields.restTo ? formatDateDisplay(fields.restTo) : "—";
+    const examDate = fields.restFrom
+      ? formatDateDisplay(fields.restFrom)
+      : todayLabel;
+    bodyLines = [
+      `This is to certify that ${patient.name}, Age ${patient.age} years, UID ${patient.uid},`,
+      `was examined by ${fields.doctorName} on ${examDate}.`,
+      "",
+      `The patient has been diagnosed with ${diagnosis} and is advised`,
+      `complete rest from ${from} to ${to}.`,
+    ];
+  } else {
+    const examined = fields.examinedOn
+      ? formatDateDisplay(fields.examinedOn)
+      : todayLabel;
+    const purpose = fields.purpose || "general purposes";
+    bodyLines = [
+      `This is to certify that ${patient.name}, Age ${patient.age} years, UID ${patient.uid},`,
+      `was examined by ${fields.doctorName} on ${examined}`,
+      `and found medically fit for ${purpose}.`,
+    ];
+  }
+
+  const LINE_H = 8;
+  for (const line of bodyLines) {
+    if (line === "") {
+      yPos += LINE_H / 2;
+    } else {
+      pdf.text(line, MARGIN, yPos);
+      yPos += LINE_H;
+    }
+  }
+
+  if (fields.remarks) {
+    yPos += 6;
+    pdf.setFont("helvetica", "bold");
+    pdf.text("Remarks: ", MARGIN, yPos);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(fields.remarks, MARGIN + 22, yPos);
+    yPos += LINE_H;
+  }
+
+  // ── Signature area ────────────────────────────────────────────
+  const sigY = A4_H - 55;
+  pdf.setFontSize(10);
+  pdf.setFont("helvetica", "bold");
+  pdf.setTextColor(30, 30, 30);
+  pdf.text("Authorised Signatory", A4_W - MARGIN, sigY, { align: "right" });
+  pdf.setFontSize(9);
+  pdf.setFont("helvetica", "bold");
+  pdf.setTextColor(26, 58, 138);
+  pdf.text(fields.doctorName, A4_W - MARGIN, sigY + 7, { align: "right" });
+  if (doctorCreds) {
+    pdf.setFontSize(8);
+    pdf.setFont("helvetica", "normal");
+    pdf.setTextColor(80, 80, 80);
+    pdf.text(doctorCreds, A4_W - MARGIN, sigY + 13, { align: "right" });
+  }
+
+  if (stampBase64) {
+    try {
+      const STAMP_W = 50;
+      const STAMP_H = 20;
+      pdf.addImage(
+        stampBase64,
+        "PNG",
+        A4_W - MARGIN - STAMP_W,
+        sigY + 17,
+        STAMP_W,
+        STAMP_H,
+      );
+    } catch {
+      /* skip */
+    }
+  }
+
+  // ── Footer ────────────────────────────────────────────────────
+  const footerY = A4_H - 10;
+  pdf.setFillColor(26, 58, 138);
+  pdf.rect(0, footerY - 8, A4_W, 18, "F");
+  pdf.setFontSize(8);
+  pdf.setFont("helvetica", "italic");
+  pdf.setTextColor(255, 255, 255);
+  pdf.text("We listen, We Care, We Heal.", A4_W / 2, footerY, {
+    align: "center",
+  });
+
+  // Save
+  const safeName = patient.name.replace(/[^a-zA-Z0-9]/g, "_");
+  const certLabel =
+    certType === "rest" ? "RestCertificate" : "FitnessCertificate";
+  pdf.save(`${certLabel}_${safeName}_${patient.uid}.pdf`);
+}
+
+// ── CertificateDialog ─────────────────────────────────────────────────────
+
+function CertificateDialog({
+  patient,
+  open,
+  onClose,
+}: {
+  patient: LocalPatient | null;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const [certType, setCertType] = useState<"rest" | "fitness">("rest");
+  const [diagnosis, setDiagnosis] = useState("");
+  const [restFrom, setRestFrom] = useState(todayStr());
+  const [restTo, setRestTo] = useState("");
+  const [examinedOn, setExaminedOn] = useState(todayStr());
+  const [purpose, setPurpose] = useState("");
+  const [remarks, setRemarks] = useState("");
+  const [doctorName, setDoctorName] = useState("Dr. Dhravid Patel");
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  // Reset when patient changes
+  useEffect(() => {
+    if (patient) {
+      setDoctorName(patient.doctorName || "Dr. Dhravid Patel");
+      setCertType("rest");
+      setDiagnosis("");
+      setRestFrom(todayStr());
+      setRestTo("");
+      setExaminedOn(todayStr());
+      setPurpose("");
+      setRemarks("");
+    }
+  }, [patient]);
+
+  async function handleGenerate() {
+    if (!patient) return;
+    setIsGenerating(true);
+    try {
+      await generateCertificatePDF(patient, certType, {
+        diagnosis,
+        restFrom,
+        restTo,
+        examinedOn,
+        purpose,
+        remarks,
+        doctorName,
+      });
+      toast.success("Certificate downloaded!");
+      onClose();
+    } catch {
+      toast.error("Failed to generate certificate");
+    } finally {
+      setIsGenerating(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-lg" data-ocid="certificate.dialog">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Award className="w-5 h-5 text-violet-600" />
+            Generate Certificate
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          {/* Certificate Type Toggle */}
+          <div className="flex rounded-lg border border-border overflow-hidden">
+            <button
+              type="button"
+              className={`flex-1 py-2.5 text-sm font-medium transition-colors ${certType === "rest" ? "bg-violet-600 text-white" : "hover:bg-accent text-muted-foreground"}`}
+              onClick={() => setCertType("rest")}
+              data-ocid="certificate.rest_tab"
+            >
+              Rest Certificate
+            </button>
+            <button
+              type="button"
+              className={`flex-1 py-2.5 text-sm font-medium transition-colors ${certType === "fitness" ? "bg-emerald-600 text-white" : "hover:bg-accent text-muted-foreground"}`}
+              onClick={() => setCertType("fitness")}
+              data-ocid="certificate.fitness_tab"
+            >
+              Fitness Certificate
+            </button>
+          </div>
+
+          {/* Doctor Select */}
+          <div className="space-y-1.5">
+            <Label>Doctor</Label>
+            <Select value={doctorName} onValueChange={setDoctorName}>
+              <SelectTrigger data-ocid="certificate.doctor_select">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Dr. Dhravid Patel">
+                  Dr. Dhravid Patel
+                </SelectItem>
+                <SelectItem value="Dr. Zeel Patel">Dr. Zeel Patel</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {certType === "rest" ? (
+            <>
+              <div className="space-y-1.5">
+                <Label>Diagnosis</Label>
+                <Input
+                  value={diagnosis}
+                  onChange={(e) => setDiagnosis(e.target.value)}
+                  placeholder="e.g. Viral fever, Acute gastritis"
+                  data-ocid="certificate.diagnosis_input"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Rest From</Label>
+                  <Input
+                    type="date"
+                    value={restFrom}
+                    onChange={(e) => setRestFrom(e.target.value)}
+                    data-ocid="certificate.rest_from_input"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Rest To</Label>
+                  <Input
+                    type="date"
+                    value={restTo}
+                    onChange={(e) => setRestTo(e.target.value)}
+                    data-ocid="certificate.rest_to_input"
+                  />
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="space-y-1.5">
+                <Label>Examined On</Label>
+                <Input
+                  type="date"
+                  value={examinedOn}
+                  onChange={(e) => setExaminedOn(e.target.value)}
+                  data-ocid="certificate.examined_on_input"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Purpose of Certificate</Label>
+                <Input
+                  value={purpose}
+                  onChange={(e) => setPurpose(e.target.value)}
+                  placeholder="e.g. school, office, sports"
+                  data-ocid="certificate.purpose_input"
+                />
+              </div>
+            </>
+          )}
+
+          <div className="space-y-1.5">
+            <Label>Doctor Remarks (Optional)</Label>
+            <Textarea
+              value={remarks}
+              onChange={(e) => setRemarks(e.target.value)}
+              placeholder="Additional remarks..."
+              rows={2}
+              data-ocid="certificate.remarks_textarea"
+            />
+          </div>
+        </div>
+
+        <DialogFooter className="gap-2">
+          <Button
+            variant="outline"
+            onClick={onClose}
+            data-ocid="certificate.cancel_button"
+          >
+            Cancel
+          </Button>
+          <Button
+            className="gap-2 bg-violet-600 hover:bg-violet-700 text-white"
+            onClick={handleGenerate}
+            disabled={isGenerating}
+            data-ocid="certificate.generate_button"
+          >
+            {isGenerating ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Download className="w-4 h-4" />
+            )}
+            Generate & Download
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 function BillingDialog({
@@ -3628,7 +4140,7 @@ function BillingDialog({
   const [gstPercent, setGstPercent] = useState(0);
   const [pastBills, setPastBills] = useState<Bill[]>([]);
   const [isSaving, setIsSaving] = useState(false);
-  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [_isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
   // Load past bills when opened
   useEffect(() => {
@@ -4209,20 +4721,7 @@ function BillingDialog({
                 )}
                 Save Bill
               </Button>
-              <Button
-                variant="outline"
-                className="gap-2 border-clinic-blue/40 text-clinic-blue hover:bg-clinic-blue/10 flex-1 sm:flex-none"
-                onClick={() => handleDownloadPDF()}
-                disabled={isGeneratingPDF}
-                data-ocid="billing.download_pdf_button"
-              >
-                {isGeneratingPDF ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Download className="w-4 h-4" />
-                )}
-                Download PDF
-              </Button>
+
               <Button
                 variant="outline"
                 className="gap-2 border-foreground/20 text-foreground hover:bg-accent flex-1 sm:flex-none"
@@ -4291,16 +4790,18 @@ function BillingDialog({
                         </div>
                       </div>
                       <div className="flex gap-1.5 flex-shrink-0 flex-wrap justify-end">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="gap-1 text-xs border-clinic-blue/40 text-clinic-blue hover:bg-clinic-blue/10"
-                          onClick={() => handleDownloadPDF(bill)}
-                          data-ocid={`billing.past_bill.download_button.${idx + 1}`}
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                          PDF
-                        </Button>
+                        {bill.status === "done" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1 text-xs border-clinic-blue/40 text-clinic-blue hover:bg-clinic-blue/10"
+                            onClick={() => handleDownloadPDF(bill)}
+                            data-ocid={`billing.past_bill.download_button.${idx + 1}`}
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            PDF
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="outline"
@@ -4770,6 +5271,8 @@ function AppShell({
   const [billingPatient, setBillingPatient] = useState<LocalPatient | null>(
     null,
   );
+  const [certificatePatient, setCertificatePatient] =
+    useState<LocalPatient | null>(null);
   const [editPatient, setEditPatient] = useState<LocalPatient | null>(null);
   const { actor, isFetching } = useActor();
   const queryClient = useQueryClient();
@@ -5243,6 +5746,7 @@ function AppShell({
               setFollowUpDialogOpen(true);
             }}
             onBill={(p) => setBillingPatient(p)}
+            onCertificate={(p) => setCertificatePatient(p)}
             onEditPatient={(p) => setEditPatient(p)}
           />
         )}
@@ -5339,6 +5843,12 @@ function AppShell({
           setEditPatient(null);
           toast.success("Patient updated successfully");
         }}
+      />
+
+      <CertificateDialog
+        patient={certificatePatient}
+        open={!!certificatePatient}
+        onClose={() => setCertificatePatient(null)}
       />
 
       {/* Footer */}
