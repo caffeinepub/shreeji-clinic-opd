@@ -46,9 +46,36 @@ export function saveAccounts(accounts: DoctorAccount[]): void {
   localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
 }
 
+// ── Nursing Accounts ─────────────────────────────────────────────────────────
+
+export interface NursingAccount {
+  userId: string;
+  password: string;
+  displayName: string;
+  role: "nursing";
+}
+
+const NURSING_ACCOUNTS_KEY = "shreeji_nursing_accounts";
+
+export function getNursingAccounts(): NursingAccount[] {
+  try {
+    const raw = localStorage.getItem(NURSING_ACCOUNTS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as NursingAccount[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveNursingAccounts(accounts: NursingAccount[]): void {
+  localStorage.setItem(NURSING_ACCOUNTS_KEY, JSON.stringify(accounts));
+}
+
 export interface AuthSession {
   userId: string;
   displayName: string;
+  role: "doctor" | "nursing";
 }
 
 const SESSION_KEY = "shreeji_auth";
@@ -86,23 +113,44 @@ export function LoginPage({ onLogin }: { onLogin: (s: AuthSession) => void }) {
 
     // Simulate a brief authentication check
     setTimeout(() => {
-      const accounts = getAccounts();
-      const account = accounts.find(
+      // Check doctor accounts first
+      const doctorAccounts = getAccounts();
+      const doctorAccount = doctorAccounts.find(
         (a) =>
           a.userId === userId.trim().toLowerCase() && a.password === password,
       );
 
-      if (account) {
+      if (doctorAccount) {
         const session: AuthSession = {
-          userId: account.userId,
-          displayName: account.displayName,
+          userId: doctorAccount.userId,
+          displayName: doctorAccount.displayName,
+          role: "doctor",
         };
         setSession(session);
         onLogin(session);
-      } else {
-        setError("Invalid User ID or Password");
-        setIsSubmitting(false);
+        return;
       }
+
+      // Check nursing accounts
+      const nursingAccounts = getNursingAccounts();
+      const nursingAccount = nursingAccounts.find(
+        (a) =>
+          a.userId === userId.trim().toLowerCase() && a.password === password,
+      );
+
+      if (nursingAccount) {
+        const session: AuthSession = {
+          userId: nursingAccount.userId,
+          displayName: nursingAccount.displayName,
+          role: "nursing",
+        };
+        setSession(session);
+        onLogin(session);
+        return;
+      }
+
+      setError("Invalid User ID or Password");
+      setIsSubmitting(false);
     }, 500);
   }
 
@@ -287,7 +335,7 @@ export function LoginPage({ onLogin }: { onLogin: (s: AuthSession) => void }) {
 
             {/* Privacy note */}
             <p className="text-center text-xs text-muted-foreground mt-5">
-              🔒 Access restricted to authorized doctors only
+              🔒 Access restricted to authorized staff only
             </p>
           </motion.div>
         </div>

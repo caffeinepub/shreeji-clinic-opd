@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -67,6 +68,7 @@ import {
   Receipt,
   Redo2,
   Search,
+  Send,
   Stethoscope,
   Trash2,
   Undo2,
@@ -85,10 +87,13 @@ import type { Patient } from "./backend.d.ts";
 import {
   type AuthSession,
   LoginPage,
+  type NursingAccount,
   clearSession,
   getAccounts,
+  getNursingAccounts,
   getSession,
   saveAccounts,
+  saveNursingAccounts,
   setSession,
 } from "./components/LoginPage";
 
@@ -458,6 +463,7 @@ function Header({
   onRestoreTrigger,
   onChangeProfile,
   onBillingClick,
+  onManageNursing,
 }: {
   onNavigate: (p: Page) => void;
   currentPage: Page;
@@ -469,6 +475,7 @@ function Header({
   onRestoreTrigger: () => void;
   onChangeProfile: () => void;
   onBillingClick: () => void;
+  onManageNursing: () => void;
 }) {
   return (
     <header className="clinic-header-gradient text-white shadow-md no-print">
@@ -529,20 +536,12 @@ function Header({
                 Navigation
               </DropdownMenuLabel>
               <DropdownMenuItem
-                onClick={() => onNavigate("dashboard")}
-                className={`gap-2 cursor-pointer ${currentPage === "dashboard" ? "bg-accent" : ""}`}
-                data-ocid="header.patients_link"
-              >
-                <Users className="w-4 h-4 text-clinic-blue" />
-                Patients
-              </DropdownMenuItem>
-              <DropdownMenuItem
                 onClick={() => onNavigate("register")}
                 className={`gap-2 cursor-pointer ${currentPage === "register" ? "bg-accent" : ""}`}
                 data-ocid="header.register_link"
               >
                 <Plus className="w-4 h-4 text-clinic-red" />
-                Register Patient
+                Patient Registration
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={onBillingClick}
@@ -552,45 +551,57 @@ function Header({
                 <Receipt className="w-4 h-4 text-emerald-600" />
                 Billing
               </DropdownMenuItem>
+              {session.role === "doctor" && (
+                <>
+                  <DropdownMenuItem
+                    onClick={() => onNavigate("dashboard")}
+                    className={`gap-2 cursor-pointer ${currentPage === "dashboard" ? "bg-accent" : ""}`}
+                    data-ocid="header.patients_link"
+                  >
+                    <Users className="w-4 h-4 text-clinic-blue" />
+                    Patients / Dashboard
+                  </DropdownMenuItem>
 
-              <DropdownMenuSeparator />
+                  <DropdownMenuSeparator />
 
-              {/* Data actions */}
-              <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wide pb-1">
-                Data
-              </DropdownMenuLabel>
-              <DropdownMenuItem
-                onClick={onExportExcel}
-                className="gap-2 cursor-pointer"
-                data-ocid="header.export_excel_button"
-              >
-                <Download className="w-4 h-4 text-muted-foreground" />
-                Export Patients (Excel)
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={onExportBillingReport}
-                className="gap-2 cursor-pointer"
-                data-ocid="header.export_billing_report_button"
-              >
-                <FileText className="w-4 h-4 text-emerald-600" />
-                Export Billing Report
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={onBackup}
-                className="gap-2 cursor-pointer"
-                data-ocid="header.backup_button"
-              >
-                <Download className="w-4 h-4 text-clinic-blue" />
-                Backup
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={onRestoreTrigger}
-                className="gap-2 cursor-pointer"
-                data-ocid="header.restore_button"
-              >
-                <Upload className="w-4 h-4 text-muted-foreground" />
-                Restore
-              </DropdownMenuItem>
+                  {/* Data actions — doctor only */}
+                  <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wide pb-1">
+                    Data
+                  </DropdownMenuLabel>
+                  <DropdownMenuItem
+                    onClick={onExportExcel}
+                    className="gap-2 cursor-pointer"
+                    data-ocid="header.export_excel_button"
+                  >
+                    <Download className="w-4 h-4 text-muted-foreground" />
+                    Export Patients (Excel)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={onExportBillingReport}
+                    className="gap-2 cursor-pointer"
+                    data-ocid="header.export_billing_report_button"
+                  >
+                    <FileText className="w-4 h-4 text-emerald-600" />
+                    Export Billing Report
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={onBackup}
+                    className="gap-2 cursor-pointer"
+                    data-ocid="header.backup_button"
+                  >
+                    <Download className="w-4 h-4 text-clinic-blue" />
+                    Backup
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={onRestoreTrigger}
+                    className="gap-2 cursor-pointer"
+                    data-ocid="header.restore_button"
+                  >
+                    <Upload className="w-4 h-4 text-muted-foreground" />
+                    Restore
+                  </DropdownMenuItem>
+                </>
+              )}
 
               <DropdownMenuSeparator />
 
@@ -598,19 +609,31 @@ function Header({
               <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wide pb-1">
                 Account
               </DropdownMenuLabel>
-              {/* Doctor info — non-clickable */}
+              {/* User info — non-clickable */}
               <div className="flex items-center gap-2 px-2 py-1.5 text-sm text-foreground/80 select-none">
                 <Stethoscope className="w-4 h-4 text-clinic-blue flex-shrink-0" />
                 <span className="truncate">{session.displayName}</span>
               </div>
-              <DropdownMenuItem
-                onClick={onChangeProfile}
-                className="gap-2 cursor-pointer"
-                data-ocid="header.change_profile_button"
-              >
-                <UserCog className="w-4 h-4 text-clinic-blue" />
-                Change Profile
-              </DropdownMenuItem>
+              {session.role === "doctor" && (
+                <>
+                  <DropdownMenuItem
+                    onClick={onChangeProfile}
+                    className="gap-2 cursor-pointer"
+                    data-ocid="header.change_profile_button"
+                  >
+                    <UserCog className="w-4 h-4 text-clinic-blue" />
+                    Change Profile
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={onManageNursing}
+                    className="gap-2 cursor-pointer"
+                    data-ocid="header.manage_nursing_button"
+                  >
+                    <Users className="w-4 h-4 text-violet-600" />
+                    Manage Nursing Users
+                  </DropdownMenuItem>
+                </>
+              )}
               <DropdownMenuItem
                 onClick={onLogout}
                 className="gap-2 cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
@@ -639,6 +662,7 @@ function FrontDeskPage({
   onRestoreTrigger,
   onChangeProfile,
   onBillingClick,
+  onManageNursing,
 }: {
   session: AuthSession;
   onNavigate: (p: Page) => void;
@@ -649,6 +673,7 @@ function FrontDeskPage({
   onRestoreTrigger: () => void;
   onChangeProfile: () => void;
   onBillingClick: () => void;
+  onManageNursing: () => void;
 }) {
   return (
     <div
@@ -724,54 +749,61 @@ function FrontDeskPage({
               Navigation
             </DropdownMenuLabel>
             <DropdownMenuItem
-              onClick={() => onNavigate("dashboard")}
-              className="gap-2 cursor-pointer"
-            >
-              <Users className="w-4 h-4 text-clinic-blue" />
-              Patients / Dashboard
-            </DropdownMenuItem>
-            <DropdownMenuItem
               onClick={onBillingClick}
               className="gap-2 cursor-pointer"
+              data-ocid="frontdesk.billing_link"
             >
               <Receipt className="w-4 h-4 text-emerald-600" />
               Billing
             </DropdownMenuItem>
 
-            <DropdownMenuSeparator />
+            {session.role === "doctor" && (
+              <>
+                <DropdownMenuItem
+                  onClick={() => onNavigate("dashboard")}
+                  className="gap-2 cursor-pointer"
+                  data-ocid="frontdesk.dashboard_link"
+                >
+                  <Users className="w-4 h-4 text-clinic-blue" />
+                  Patients / Dashboard
+                </DropdownMenuItem>
 
-            {/* Data */}
-            <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wide pb-1">
-              Data
-            </DropdownMenuLabel>
-            <DropdownMenuItem
-              onClick={onExportExcel}
-              className="gap-2 cursor-pointer"
-            >
-              <Download className="w-4 h-4 text-muted-foreground" />
-              Export Patients (Excel)
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={onExportBillingReport}
-              className="gap-2 cursor-pointer"
-            >
-              <FileText className="w-4 h-4 text-emerald-600" />
-              Export Billing Report
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={onBackup}
-              className="gap-2 cursor-pointer"
-            >
-              <Download className="w-4 h-4 text-clinic-blue" />
-              Backup
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={onRestoreTrigger}
-              className="gap-2 cursor-pointer"
-            >
-              <Upload className="w-4 h-4 text-muted-foreground" />
-              Restore
-            </DropdownMenuItem>
+                <DropdownMenuSeparator />
+
+                {/* Data — doctor only */}
+                <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wide pb-1">
+                  Data
+                </DropdownMenuLabel>
+                <DropdownMenuItem
+                  onClick={onExportExcel}
+                  className="gap-2 cursor-pointer"
+                >
+                  <Download className="w-4 h-4 text-muted-foreground" />
+                  Export Patients (Excel)
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={onExportBillingReport}
+                  className="gap-2 cursor-pointer"
+                >
+                  <FileText className="w-4 h-4 text-emerald-600" />
+                  Export Billing Report
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={onBackup}
+                  className="gap-2 cursor-pointer"
+                >
+                  <Download className="w-4 h-4 text-clinic-blue" />
+                  Backup
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={onRestoreTrigger}
+                  className="gap-2 cursor-pointer"
+                >
+                  <Upload className="w-4 h-4 text-muted-foreground" />
+                  Restore
+                </DropdownMenuItem>
+              </>
+            )}
 
             <DropdownMenuSeparator />
 
@@ -779,13 +811,25 @@ function FrontDeskPage({
             <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wide pb-1">
               Account
             </DropdownMenuLabel>
-            <DropdownMenuItem
-              onClick={onChangeProfile}
-              className="gap-2 cursor-pointer"
-            >
-              <UserCog className="w-4 h-4 text-clinic-blue" />
-              Change Profile
-            </DropdownMenuItem>
+            {session.role === "doctor" && (
+              <>
+                <DropdownMenuItem
+                  onClick={onChangeProfile}
+                  className="gap-2 cursor-pointer"
+                >
+                  <UserCog className="w-4 h-4 text-clinic-blue" />
+                  Change Profile
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={onManageNursing}
+                  className="gap-2 cursor-pointer"
+                  data-ocid="frontdesk.manage_nursing_button"
+                >
+                  <Users className="w-4 h-4 text-violet-600" />
+                  Manage Nursing Users
+                </DropdownMenuItem>
+              </>
+            )}
             <DropdownMenuItem
               onClick={onLogout}
               className="gap-2 cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
@@ -975,7 +1019,9 @@ function DashboardPage({
   onFollowUp,
   onBill,
   onCertificate,
+  onReferral,
   onEditPatient,
+  isNursing,
 }: {
   patients: LocalPatient[];
   isLoading: boolean;
@@ -986,7 +1032,9 @@ function DashboardPage({
   onFollowUp: (p: LocalPatient) => void;
   onBill: (p: LocalPatient) => void;
   onCertificate: (p: LocalPatient) => void;
+  onReferral: (p: LocalPatient) => void;
   onEditPatient: (p: LocalPatient) => void;
+  isNursing?: boolean;
 }) {
   const [search, setSearch] = useState("");
 
@@ -1114,26 +1162,30 @@ function DashboardPage({
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="gap-1.5 text-xs"
-                        onClick={() => onViewPrescription(patient)}
-                        data-ocid={`dashboard.view_prescription_button.${idx + 1}`}
-                      >
-                        <FileText className="w-3.5 h-3.5" />
-                        Prescription
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="gap-1.5 text-xs"
-                        onClick={() => onViewHistory(patient)}
-                        data-ocid={`dashboard.view_history_button.${idx + 1}`}
-                      >
-                        <Clock className="w-3.5 h-3.5" />
-                        History
-                      </Button>
+                      {!isNursing && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1.5 text-xs"
+                            onClick={() => onViewPrescription(patient)}
+                            data-ocid={`dashboard.view_prescription_button.${idx + 1}`}
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            Prescription
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1.5 text-xs"
+                            onClick={() => onViewHistory(patient)}
+                            data-ocid={`dashboard.view_history_button.${idx + 1}`}
+                          >
+                            <Clock className="w-3.5 h-3.5" />
+                            History
+                          </Button>
+                        </>
+                      )}
                       <Button
                         size="sm"
                         variant="outline"
@@ -1144,26 +1196,40 @@ function DashboardPage({
                         <Receipt className="w-3.5 h-3.5" />
                         Bill
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="gap-1.5 text-xs text-clinic-blue border-clinic-blue/30 hover:bg-clinic-blue/10 hover:text-clinic-blue"
-                        onClick={() => onFollowUp(patient)}
-                        data-ocid={`dashboard.followup_button.${idx + 1}`}
-                      >
-                        <CalendarPlus className="w-3.5 h-3.5" />
-                        Follow-up
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="gap-1.5 text-xs text-violet-700 border-violet-300 hover:bg-violet-50 hover:text-violet-800"
-                        onClick={() => onCertificate(patient)}
-                        data-ocid={`dashboard.certificate_button.${idx + 1}`}
-                      >
-                        <Award className="w-3.5 h-3.5" />
-                        Certificate
-                      </Button>
+                      {!isNursing && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1.5 text-xs text-clinic-blue border-clinic-blue/30 hover:bg-clinic-blue/10 hover:text-clinic-blue"
+                            onClick={() => onFollowUp(patient)}
+                            data-ocid={`dashboard.followup_button.${idx + 1}`}
+                          >
+                            <CalendarPlus className="w-3.5 h-3.5" />
+                            Follow-up
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1.5 text-xs text-violet-700 border-violet-300 hover:bg-violet-50 hover:text-violet-800"
+                            onClick={() => onCertificate(patient)}
+                            data-ocid={`dashboard.certificate_button.${idx + 1}`}
+                          >
+                            <Award className="w-3.5 h-3.5" />
+                            Certificate
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1.5 text-xs text-teal-700 border-teal-300 hover:bg-teal-50 hover:text-teal-800"
+                            onClick={() => onReferral(patient)}
+                            data-ocid={`dashboard.referral_button.${idx + 1}`}
+                          >
+                            <Send className="w-3.5 h-3.5" />
+                            Referral
+                          </Button>
+                        </>
+                      )}
                       <Button
                         size="sm"
                         variant="ghost"
@@ -3915,6 +3981,247 @@ async function generateCertificatePDF(
   pdf.save(`${certLabel}_${safeName}_${patient.uid}.pdf`);
 }
 
+// ── generateReferralPDF ───────────────────────────────────────────────────
+
+async function generateReferralPDF(
+  patient: LocalPatient,
+  fields: {
+    doctorName: string;
+    referredToDoctor: string;
+    referredToDept: string;
+    referredToHospital?: string;
+    reason: string;
+    urgency: "normal" | "urgent";
+    remarks?: string;
+  },
+): Promise<void> {
+  const jsPDF = await loadJsPDF();
+
+  const A4_W = 210;
+  const A4_H = 297;
+  const MARGIN = 14;
+
+  // Load logo
+  let logoBase64 = "";
+  try {
+    const resp = await fetch(
+      "/assets/generated/logo-white-circle.dim_400x400.png",
+    );
+    const blob = await resp.blob();
+    logoBase64 = await new Promise<string>((res) => {
+      const reader = new FileReader();
+      reader.onload = () => res(reader.result as string);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    /* skip */
+  }
+
+  // Load stamp
+  const stampFile =
+    fields.doctorName === "Dr. Dhravid Patel"
+      ? "/assets/generated/stamp-dhravid-transparent.dim_300x120.png"
+      : "/assets/generated/stamp-zeel-transparent.dim_300x120.png";
+  let stampBase64 = "";
+  try {
+    const stampResp = await fetch(stampFile);
+    const stampBlob = await stampResp.blob();
+    stampBase64 = await new Promise<string>((res) => {
+      const reader = new FileReader();
+      reader.onload = () => res(reader.result as string);
+      reader.readAsDataURL(stampBlob);
+    });
+  } catch {
+    /* skip */
+  }
+
+  const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+
+  const pdfAny = pdf as any;
+  // ── Header band ──────────────────────────────────────────────
+  const LOGO_SIZE = 22;
+  const HEADER_H = 36;
+  pdf.setFillColor(26, 58, 138);
+  pdf.rect(0, 0, A4_W, HEADER_H, "F");
+  pdf.setFillColor(192, 57, 43);
+  pdf.rect(A4_W * 0.6, 0, A4_W * 0.4, HEADER_H, "F");
+
+  if (logoBase64) {
+    try {
+      pdf.addImage(logoBase64, "PNG", MARGIN, 7, LOGO_SIZE, LOGO_SIZE);
+    } catch {
+      /* skip */
+    }
+  }
+
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFontSize(16);
+  pdf.setFont("helvetica", "bold");
+  pdf.text("Shreeji Clinic", MARGIN + LOGO_SIZE + 4, 16);
+  pdf.setFontSize(8);
+  pdf.setFont("helvetica", "normal");
+  pdf.text("OPD — Referral Letter", MARGIN + LOGO_SIZE + 4, 23);
+
+  const doctorCreds = getDoctorCredentials(fields.doctorName);
+  pdf.setFontSize(10);
+  pdf.setFont("helvetica", "bold");
+  pdf.setTextColor(255, 255, 255);
+  pdf.text(fields.doctorName, A4_W - MARGIN, 14, { align: "right" });
+  if (doctorCreds) {
+    pdf.setFontSize(7.5);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(doctorCreds, A4_W - MARGIN, 20, { align: "right" });
+  }
+  const todayFormatted = new Date().toLocaleDateString("en-GB");
+  pdf.setFontSize(8);
+  pdf.setFont("helvetica", "normal");
+  pdf.text(`Date: ${todayFormatted}`, A4_W - MARGIN, 30, { align: "right" });
+
+  // ── Patient info band ─────────────────────────────────────────
+  let yPos = HEADER_H + 8;
+  pdf.setFillColor(240, 245, 255);
+  pdf.rect(0, HEADER_H + 2, A4_W, 18, "F");
+  pdf.setFontSize(9);
+  pdf.setFont("helvetica", "normal");
+  pdf.setTextColor(40, 40, 40);
+  const patInfo = [
+    `UID: ${patient.uid}`,
+    `Name: ${patient.name}`,
+    `Age/Sex: ${patient.age}Y / ${patient.sex}`,
+    `Contact: ${patient.contact}`,
+  ];
+  const colW = (A4_W - MARGIN * 2) / 2;
+  patInfo.forEach((info, i) => {
+    const col = i % 2;
+    const row = Math.floor(i / 2);
+    pdf.text(info, MARGIN + col * colW, HEADER_H + 8 + row * 6);
+  });
+  yPos = HEADER_H + 26;
+
+  // ── Title ─────────────────────────────────────────────────────
+  yPos += 8;
+  pdf.setFontSize(16);
+  pdf.setFont("helvetica", "bold");
+  pdf.setTextColor(0, 128, 128);
+  pdf.text("REFERRAL LETTER", A4_W / 2, yPos, { align: "center" });
+  yPos += 3;
+  pdfAny.setDrawColor(220, 50, 50);
+  pdfAny.setLineWidth(0.8);
+  pdfAny.line(MARGIN + 30, yPos, A4_W - MARGIN - 30, yPos);
+  yPos += 10;
+
+  // ── Body ─────────────────────────────────────────────────────
+  pdf.setFontSize(11);
+  pdf.setFont("helvetica", "normal");
+  pdf.setTextColor(30, 30, 30);
+  const LINE_H = 7;
+
+  const lines: string[] = [
+    `Dear Dr. ${fields.referredToDoctor},`,
+    "",
+    `We are referring our patient ${patient.name}, Age ${patient.age} years,`,
+    `UID: ${patient.uid}, for your expert opinion and management.`,
+    "",
+    `Department / Speciality: ${fields.referredToDept}`,
+  ];
+  if (fields.referredToHospital) {
+    lines.push(`Hospital / Clinic: ${fields.referredToHospital}`);
+  }
+  lines.push("");
+  lines.push("Reason for Referral / Diagnosis:");
+
+  for (const line of lines) {
+    if (line === "") {
+      yPos += LINE_H / 2;
+    } else {
+      pdf.text(line, MARGIN, yPos);
+      yPos += LINE_H;
+    }
+  }
+
+  // Wrapped reason
+  const wrappedReason = pdfAny.splitTextToSize(
+    fields.reason,
+    A4_W - MARGIN * 2 - 4,
+  );
+  for (const rline of wrappedReason) {
+    pdf.text(`  ${rline}`, MARGIN, yPos);
+    yPos += LINE_H;
+  }
+
+  yPos += LINE_H / 2;
+  pdf.setFont("helvetica", "bold");
+  pdf.text("Urgency: ", MARGIN, yPos);
+  pdf.setFont("helvetica", "normal");
+  const urgencyText = fields.urgency === "urgent" ? "URGENT" : "Normal";
+  if (fields.urgency === "urgent") {
+    pdf.setTextColor(200, 30, 30);
+  }
+  pdf.text(urgencyText, MARGIN + 22, yPos);
+  pdf.setTextColor(30, 30, 30);
+  yPos += LINE_H;
+
+  if (fields.remarks) {
+    yPos += 4;
+    pdf.setFont("helvetica", "bold");
+    pdf.text("Remarks: ", MARGIN, yPos);
+    pdf.setFont("helvetica", "normal");
+    const wrappedRemarks = pdfAny.splitTextToSize(
+      fields.remarks,
+      A4_W - MARGIN * 2 - 25,
+    );
+    pdf.text(wrappedRemarks[0], MARGIN + 22, yPos);
+    yPos += LINE_H;
+  }
+
+  // ── Signature area ─────────────────────────────────────────────
+  const sigY = A4_H - 55;
+  pdf.setFontSize(10);
+  pdf.setFont("helvetica", "bold");
+  pdf.setTextColor(30, 30, 30);
+  pdf.text("Authorised Signatory", A4_W - MARGIN, sigY, { align: "right" });
+  pdf.setFontSize(9);
+  pdf.setFont("helvetica", "bold");
+  pdf.setTextColor(26, 58, 138);
+  pdf.text(fields.doctorName, A4_W - MARGIN, sigY + 7, { align: "right" });
+  if (doctorCreds) {
+    pdf.setFontSize(8);
+    pdf.setFont("helvetica", "normal");
+    pdf.setTextColor(80, 80, 80);
+    pdf.text(doctorCreds, A4_W - MARGIN, sigY + 13, { align: "right" });
+  }
+
+  if (stampBase64) {
+    try {
+      const STAMP_W = 50;
+      const STAMP_H = 20;
+      pdf.addImage(
+        stampBase64,
+        "PNG",
+        A4_W - MARGIN - STAMP_W,
+        sigY + 17,
+        STAMP_W,
+        STAMP_H,
+      );
+    } catch {
+      /* skip */
+    }
+  }
+
+  // ── Footer ────────────────────────────────────────────────────
+  const footerY = A4_H - 10;
+  pdf.setFillColor(26, 58, 138);
+  pdf.rect(0, footerY - 8, A4_W, 18, "F");
+  pdf.setFontSize(8);
+  pdf.setFont("helvetica", "italic");
+  pdf.setTextColor(255, 255, 255);
+  pdf.text("We listen, We Care, We Heal.", A4_W / 2, footerY, {
+    align: "center",
+  });
+
+  pdf.save(`ReferralLetter_${patient.uid}.pdf`);
+}
+
 // ── CertificateDialog ─────────────────────────────────────────────────────
 
 function CertificateDialog({
@@ -4104,6 +4411,205 @@ function CertificateDialog({
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
               <Download className="w-4 h-4" />
+            )}
+            Generate & Download
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── ReferralDialog ────────────────────────────────────────────────────────
+
+function ReferralDialog({
+  patient,
+  open,
+  onClose,
+}: {
+  patient: LocalPatient | null;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const [doctorName, setDoctorName] = useState("Dr. Dhravid Patel");
+  const [referredToDoctor, setReferredToDoctor] = useState("");
+  const [referredToDept, setReferredToDept] = useState("");
+  const [referredToHospital, setReferredToHospital] = useState("");
+  const [reason, setReason] = useState("");
+  const [urgency, setUrgency] = useState<"normal" | "urgent">("normal");
+  const [remarks, setRemarks] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  useEffect(() => {
+    if (patient) {
+      setDoctorName(patient.doctorName || "Dr. Dhravid Patel");
+      setReferredToDoctor("");
+      setReferredToDept("");
+      setReferredToHospital("");
+      setReason("");
+      setUrgency("normal");
+      setRemarks("");
+    }
+  }, [patient]);
+
+  async function handleGenerate() {
+    if (!patient || !referredToDoctor || !referredToDept || !reason) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+    setIsGenerating(true);
+    try {
+      await generateReferralPDF(patient, {
+        doctorName,
+        referredToDoctor,
+        referredToDept,
+        referredToHospital: referredToHospital || undefined,
+        reason,
+        urgency,
+        remarks: remarks || undefined,
+      });
+      toast.success("Referral letter downloaded!");
+      onClose();
+    } catch {
+      toast.error("Failed to generate referral letter");
+    } finally {
+      setIsGenerating(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-lg" data-ocid="referral.dialog">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Send className="w-5 h-5 text-teal-600" />
+            Generate Referral Letter
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          {/* Doctor Select */}
+          <div className="space-y-1.5">
+            <Label>From Doctor</Label>
+            <Select value={doctorName} onValueChange={setDoctorName}>
+              <SelectTrigger data-ocid="referral.doctor_select">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Dr. Dhravid Patel">
+                  Dr. Dhravid Patel
+                </SelectItem>
+                <SelectItem value="Dr. Zeel Patel">Dr. Zeel Patel</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Referred To Doctor */}
+          <div className="space-y-1.5">
+            <Label>
+              Referred To Doctor Name <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              value={referredToDoctor}
+              onChange={(e) => setReferredToDoctor(e.target.value)}
+              placeholder="e.g. Dr. Rahul Sharma"
+              data-ocid="referral.referred_to_input"
+            />
+          </div>
+
+          {/* Department */}
+          <div className="space-y-1.5">
+            <Label>
+              Department / Speciality <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              value={referredToDept}
+              onChange={(e) => setReferredToDept(e.target.value)}
+              placeholder="e.g. Orthopedics, Cardiology"
+              data-ocid="referral.department_input"
+            />
+          </div>
+
+          {/* Hospital */}
+          <div className="space-y-1.5">
+            <Label>Hospital / Clinic Name (Optional)</Label>
+            <Input
+              value={referredToHospital}
+              onChange={(e) => setReferredToHospital(e.target.value)}
+              placeholder="e.g. City General Hospital"
+              data-ocid="referral.hospital_input"
+            />
+          </div>
+
+          {/* Reason */}
+          <div className="space-y-1.5">
+            <Label>
+              Reason for Referral / Diagnosis{" "}
+              <span className="text-red-500">*</span>
+            </Label>
+            <Textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Describe the reason for referral..."
+              rows={3}
+              data-ocid="referral.reason_textarea"
+            />
+          </div>
+
+          {/* Urgency */}
+          <div className="space-y-1.5">
+            <Label>Urgency</Label>
+            <div className="flex rounded-lg border border-border overflow-hidden">
+              <button
+                type="button"
+                className={`flex-1 py-2.5 text-sm font-medium transition-colors ${urgency === "normal" ? "bg-gray-600 text-white" : "hover:bg-accent text-muted-foreground"}`}
+                onClick={() => setUrgency("normal")}
+                data-ocid="referral.urgency_normal_toggle"
+              >
+                Normal
+              </button>
+              <button
+                type="button"
+                className={`flex-1 py-2.5 text-sm font-medium transition-colors ${urgency === "urgent" ? "bg-red-600 text-white" : "hover:bg-accent text-muted-foreground"}`}
+                onClick={() => setUrgency("urgent")}
+                data-ocid="referral.urgency_urgent_toggle"
+              >
+                Urgent
+              </button>
+            </div>
+          </div>
+
+          {/* Remarks */}
+          <div className="space-y-1.5">
+            <Label>Remarks (Optional)</Label>
+            <Textarea
+              value={remarks}
+              onChange={(e) => setRemarks(e.target.value)}
+              placeholder="Additional remarks..."
+              rows={2}
+              data-ocid="referral.remarks_textarea"
+            />
+          </div>
+        </div>
+
+        <DialogFooter className="gap-2">
+          <Button
+            variant="outline"
+            onClick={onClose}
+            data-ocid="referral.cancel_button"
+          >
+            Cancel
+          </Button>
+          <Button
+            className="gap-2 bg-teal-600 hover:bg-teal-700 text-white"
+            onClick={handleGenerate}
+            disabled={isGenerating}
+            data-ocid="referral.generate_button"
+          >
+            {isGenerating ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Send className="w-4 h-4" />
             )}
             Generate & Download
           </Button>
@@ -4910,6 +5416,289 @@ function BillingDialog({
   );
 }
 
+// ── Manage Nursing Users Dialog ───────────────────────────────────────────
+
+function ManageNursingUsersDialog({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  const [accounts, setAccounts] = useState<NursingAccount[]>([]);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<NursingAccount | null>(
+    null,
+  );
+
+  // Form fields
+  const [formDisplayName, setFormDisplayName] = useState("");
+  const [formUserId, setFormUserId] = useState("");
+  const [formPassword, setFormPassword] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      setAccounts(getNursingAccounts());
+      setShowAddForm(false);
+      setEditingAccount(null);
+      setFormDisplayName("");
+      setFormUserId("");
+      setFormPassword("");
+      setFormError(null);
+    }
+  }, [open]);
+
+  function openAdd() {
+    setEditingAccount(null);
+    setFormDisplayName("");
+    setFormUserId("");
+    setFormPassword("");
+    setFormError(null);
+    setShowAddForm(true);
+  }
+
+  function openEdit(account: NursingAccount) {
+    setShowAddForm(false);
+    setEditingAccount(account);
+    setFormDisplayName(account.displayName);
+    setFormUserId(account.userId);
+    setFormPassword(account.password);
+    setFormError(null);
+  }
+
+  function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    setFormError(null);
+    const trimName = formDisplayName.trim();
+    const trimId = formUserId.trim().toLowerCase();
+    const trimPw = formPassword.trim();
+    if (!trimName || !trimId || !trimPw) {
+      setFormError("All fields are required");
+      return;
+    }
+
+    let updated: NursingAccount[];
+    if (editingAccount) {
+      // Check for duplicate userId (excluding self)
+      const duplicate = accounts.find(
+        (a) => a.userId === trimId && a.userId !== editingAccount.userId,
+      );
+      if (duplicate) {
+        setFormError("User ID already in use");
+        return;
+      }
+      updated = accounts.map((a) =>
+        a.userId === editingAccount.userId
+          ? { ...a, userId: trimId, displayName: trimName, password: trimPw }
+          : a,
+      );
+      toast.success("Nursing user updated");
+    } else {
+      // Check for duplicate userId
+      if (accounts.find((a) => a.userId === trimId)) {
+        setFormError("User ID already in use");
+        return;
+      }
+      const newAccount: NursingAccount = {
+        userId: trimId,
+        password: trimPw,
+        displayName: trimName,
+        role: "nursing",
+      };
+      updated = [...accounts, newAccount];
+      toast.success("Nursing user added");
+    }
+
+    saveNursingAccounts(updated);
+    setAccounts(updated);
+    setShowAddForm(false);
+    setEditingAccount(null);
+    setFormDisplayName("");
+    setFormUserId("");
+    setFormPassword("");
+  }
+
+  function handleDelete(userId: string) {
+    const updated = accounts.filter((a) => a.userId !== userId);
+    saveNursingAccounts(updated);
+    setAccounts(updated);
+    if (editingAccount?.userId === userId) {
+      setEditingAccount(null);
+    }
+    toast.success("Nursing user removed");
+  }
+
+  const showForm = showAddForm || !!editingAccount;
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-lg" data-ocid="manage_nursing.dialog">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Users className="w-5 h-5 text-violet-600" />
+            Manage Nursing Users
+          </DialogTitle>
+          <DialogDescription>
+            Add, edit, or remove nursing staff accounts. Nursing users can only
+            access Patient Registration and Billing.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          {/* Account list */}
+          {accounts.length === 0 && !showForm && (
+            <div
+              className="text-center py-6 text-muted-foreground text-sm"
+              data-ocid="manage_nursing.empty_state"
+            >
+              No nursing users yet. Add one below.
+            </div>
+          )}
+          {accounts.length > 0 && (
+            <div className="space-y-2">
+              {accounts.map((account, idx) => (
+                <div
+                  key={account.userId}
+                  className="flex items-center justify-between rounded-lg border border-border px-3 py-2.5 bg-secondary/30"
+                  data-ocid={`manage_nursing.item.${idx + 1}`}
+                >
+                  <div>
+                    <p className="font-medium text-sm">{account.displayName}</p>
+                    <p className="text-xs text-muted-foreground font-mono">
+                      {account.userId}
+                    </p>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 w-8 p-0 text-clinic-blue hover:text-clinic-blue hover:bg-clinic-blue/10"
+                      onClick={() => openEdit(account)}
+                      data-ocid={`manage_nursing.edit_button.${idx + 1}`}
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => handleDelete(account.userId)}
+                      data-ocid={`manage_nursing.delete_button.${idx + 1}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Add / Edit Form */}
+          {showForm && (
+            <form
+              onSubmit={handleSave}
+              className="space-y-3 border border-border rounded-lg p-4 bg-background"
+            >
+              <h3 className="font-semibold text-sm">
+                {editingAccount ? "Edit Nursing User" : "Add Nursing User"}
+              </h3>
+              <div className="space-y-1.5">
+                <Label htmlFor="nu-name">Display Name *</Label>
+                <Input
+                  id="nu-name"
+                  placeholder="e.g. Nurse Priya"
+                  value={formDisplayName}
+                  onChange={(e) => setFormDisplayName(e.target.value)}
+                  required
+                  data-ocid="manage_nursing.name_input"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="nu-userid">User ID *</Label>
+                <Input
+                  id="nu-userid"
+                  placeholder="e.g. nurse.priya"
+                  value={formUserId}
+                  onChange={(e) => setFormUserId(e.target.value)}
+                  required
+                  data-ocid="manage_nursing.input"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="nu-password">Password *</Label>
+                <Input
+                  id="nu-password"
+                  type="password"
+                  placeholder="Password"
+                  value={formPassword}
+                  onChange={(e) => setFormPassword(e.target.value)}
+                  required
+                  data-ocid="manage_nursing.password_input"
+                />
+              </div>
+              {formError && (
+                <p
+                  className="text-xs text-destructive"
+                  data-ocid="manage_nursing.error_state"
+                >
+                  {formError}
+                </p>
+              )}
+              <div className="flex gap-2 pt-1">
+                <Button
+                  type="submit"
+                  size="sm"
+                  className="bg-clinic-blue hover:bg-clinic-blue/90 text-white"
+                  data-ocid="manage_nursing.save_button"
+                >
+                  {editingAccount ? "Save Changes" : "Add User"}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setShowAddForm(false);
+                    setEditingAccount(null);
+                  }}
+                  data-ocid="manage_nursing.cancel_button"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          )}
+
+          {/* Add button */}
+          {!showForm && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-full gap-2 text-clinic-blue border-clinic-blue/30 hover:bg-clinic-blue/10"
+              onClick={openAdd}
+              data-ocid="manage_nursing.open_modal_button"
+            >
+              <Plus className="w-4 h-4" />
+              Add Nursing User
+            </Button>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={onClose}
+            data-ocid="manage_nursing.close_button"
+          >
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Change Profile Dialog ──────────────────────────────────────────────────
 
 function ChangeProfileDialog({
@@ -5024,6 +5813,7 @@ function ChangeProfileDialog({
       const updatedSession: AuthSession = {
         userId: updatedAccount.userId,
         displayName: account.displayName,
+        role: session.role,
       };
       setSession(updatedSession);
       onSessionUpdate(updatedSession);
@@ -5268,11 +6058,15 @@ function AppShell({
     loadLocalPatients(),
   );
   const [changeProfileOpen, setChangeProfileOpen] = useState(false);
+  const [manageNursingOpen, setManageNursingOpen] = useState(false);
   const [billingPatient, setBillingPatient] = useState<LocalPatient | null>(
     null,
   );
   const [certificatePatient, setCertificatePatient] =
     useState<LocalPatient | null>(null);
+  const [referralPatient, setReferralPatient] = useState<LocalPatient | null>(
+    null,
+  );
   const [editPatient, setEditPatient] = useState<LocalPatient | null>(null);
   const { actor, isFetching } = useActor();
   const queryClient = useQueryClient();
@@ -5383,14 +6177,22 @@ function AppShell({
     (patient: LocalPatient) => {
       registerMutation.mutate(patient, {
         onSuccess: () => {
-          setSelectedPatient(patient);
-          setPage("prescription");
+          if (isNursing) {
+            setPage("dashboard");
+          } else {
+            setSelectedPatient(patient);
+            setPage("prescription");
+          }
           toast.success(`Patient ${patient.name} registered successfully`);
         },
         onError: () => {
           // Still navigate even if backend fails
-          setSelectedPatient(patient);
-          setPage("prescription");
+          if (isNursing) {
+            setPage("dashboard");
+          } else {
+            setSelectedPatient(patient);
+            setPage("prescription");
+          }
           toast.success(`Patient ${patient.name} registered (offline)`);
         },
       });
@@ -5628,6 +6430,7 @@ function AppShell({
   }
 
   const isLoading = backendLoading && localPatients.length === 0;
+  const isNursing = session.role === "nursing";
 
   // Shared action props used by both Header and FrontDeskPage
   const sharedActions = {
@@ -5637,6 +6440,7 @@ function AppShell({
     onBackup: handleBackup,
     onRestoreTrigger: handleRestoreTrigger,
     onChangeProfile: () => setChangeProfileOpen(true),
+    onManageNursing: () => setManageNursingOpen(true),
     onBillingClick: () => {
       toast.info("Select a patient from the dashboard to create a bill", {
         description: "Click the 'Bill' button next to a patient row",
@@ -5694,6 +6498,10 @@ function AppShell({
             setSessionState(updatedSession);
           }}
         />
+        <ManageNursingUsersDialog
+          open={manageNursingOpen}
+          onClose={() => setManageNursingOpen(false)}
+        />
         <BillingDialog
           patient={billingPatient}
           open={!!billingPatient}
@@ -5747,7 +6555,9 @@ function AppShell({
             }}
             onBill={(p) => setBillingPatient(p)}
             onCertificate={(p) => setCertificatePatient(p)}
+            onReferral={(p) => setReferralPatient(p)}
             onEditPatient={(p) => setEditPatient(p)}
+            isNursing={isNursing}
           />
         )}
 
@@ -5827,6 +6637,10 @@ function AppShell({
           setSessionState(updatedSession);
         }}
       />
+      <ManageNursingUsersDialog
+        open={manageNursingOpen}
+        onClose={() => setManageNursingOpen(false)}
+      />
 
       <BillingDialog
         patient={billingPatient}
@@ -5849,6 +6663,12 @@ function AppShell({
         patient={certificatePatient}
         open={!!certificatePatient}
         onClose={() => setCertificatePatient(null)}
+      />
+
+      <ReferralDialog
+        patient={referralPatient}
+        open={!!referralPatient}
+        onClose={() => setReferralPatient(null)}
       />
 
       {/* Footer */}
