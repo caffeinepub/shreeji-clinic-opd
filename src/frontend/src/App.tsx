@@ -207,6 +207,7 @@ interface LocalPatient {
   imageData: string;
   canvasData: string;
   historyNotes: string;
+  vitals?: { bp: string; pulse: string; spo2: string };
 }
 
 interface TypedContent {
@@ -1280,6 +1281,7 @@ function RegistrationPage({
     contact: "",
     registrationDate: todayStr(),
     doctorName: "Dr. Dhravid Patel",
+    vitals: { bp: "", pulse: "", spo2: "" },
   });
   const [isSaving, setIsSaving] = useState(false);
 
@@ -1460,6 +1462,72 @@ function RegistrationPage({
           </div>
         </div>
 
+        {/* Vitals (Optional) */}
+        <div className="space-y-3 border border-border rounded-lg p-4">
+          <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+            Vitals{" "}
+            <span className="font-normal normal-case text-xs">
+              (Optional — shown on prescription)
+            </span>
+          </p>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="bp">Blood Pressure</Label>
+              <Input
+                id="bp"
+                placeholder="120/80 mmHg"
+                value={form.vitals?.bp ?? ""}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    vitals: {
+                      ...(form.vitals ?? { bp: "", pulse: "", spo2: "" }),
+                      bp: e.target.value,
+                    },
+                  })
+                }
+                data-ocid="registration.bp_input"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="pulse">Pulse</Label>
+              <Input
+                id="pulse"
+                placeholder="72 bpm"
+                value={form.vitals?.pulse ?? ""}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    vitals: {
+                      ...(form.vitals ?? { bp: "", pulse: "", spo2: "" }),
+                      pulse: e.target.value,
+                    },
+                  })
+                }
+                data-ocid="registration.pulse_input"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="spo2">SpO2</Label>
+              <Input
+                id="spo2"
+                placeholder="98%"
+                value={form.vitals?.spo2 ?? ""}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    vitals: {
+                      ...(form.vitals ?? { bp: "", pulse: "", spo2: "" }),
+                      spo2: e.target.value,
+                    },
+                  })
+                }
+                data-ocid="registration.spo2_input"
+              />
+            </div>
+          </div>
+        </div>
+
         {/* Actions */}
         <div className="flex gap-3 pt-2">
           <Button
@@ -1542,6 +1610,7 @@ function DrawingCanvas({
 
   function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
     if (locked) return;
+    if (e.pointerType !== "pen") return;
     e.preventDefault();
     pushSnapshot();
     isDrawing.current = true;
@@ -1554,6 +1623,7 @@ function DrawingCanvas({
 
   function handlePointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
     if (locked) return;
+    if (e.pointerType !== "pen") return;
     e.preventDefault();
     if (!isDrawing.current || !lastPoint.current) return;
     const canvas = canvasRef.current!;
@@ -1582,6 +1652,7 @@ function DrawingCanvas({
 
   function handlePointerUp(e: React.PointerEvent<HTMLCanvasElement>) {
     if (locked) return;
+    if (e.pointerType !== "pen") return;
     e.preventDefault();
     isDrawing.current = false;
     lastPoint.current = null;
@@ -1592,6 +1663,7 @@ function DrawingCanvas({
 
   function handlePointerLeave(e: React.PointerEvent<HTMLCanvasElement>) {
     if (locked) return;
+    if (e.pointerType !== "pen") return;
     e.preventDefault();
     isDrawing.current = false;
     lastPoint.current = null;
@@ -2524,6 +2596,16 @@ function PrescriptionPage({
     { label: followUpDate ? "Follow-up" : "Date", value: visitDateDisplay },
   ];
 
+  const vitalsDisplay = (() => {
+    const v = currentPatient.vitals;
+    if (!v) return "";
+    const parts: string[] = [];
+    if (v.bp) parts.push(`BP: ${v.bp}`);
+    if (v.pulse) parts.push(`Pulse: ${v.pulse}`);
+    if (v.spo2) parts.push(`SpO2: ${v.spo2}`);
+    return parts.join("  |  ");
+  })();
+
   // ── Generate Prescription PDF ─────────────────────────────────────────────
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
@@ -2672,7 +2754,29 @@ function PrescriptionPage({
           pdf.text(val, cx, bandY + 11, { align: "center" });
         });
 
-        return bandY + 18 + 4; // return y position after header + small gap
+        let yAfterBand = bandY + 18 + 4;
+
+        // Vitals row if present
+        const pv = currentPatient.vitals;
+        if (pv && (pv.bp || pv.pulse || pv.spo2)) {
+          const vParts: string[] = [];
+          if (pv.bp) vParts.push(`BP: ${pv.bp}`);
+          if (pv.pulse) vParts.push(`Pulse: ${pv.pulse}`);
+          if (pv.spo2) vParts.push(`SpO2: ${pv.spo2}`);
+          pdf.setFillColor(230, 240, 255);
+          pdf.rect(0, yAfterBand - 2, A4_W, 8, "F");
+          pdf.setFontSize(7.5);
+          pdf.setFont("helvetica", "bold");
+          pdf.setTextColor(26, 58, 138);
+          pdf.text(
+            `Vitals:  ${vParts.join("   |   ")}`,
+            MARGIN,
+            yAfterBand + 3.5,
+          );
+          yAfterBand += 10;
+        }
+
+        return yAfterBand; // return y position after header + small gap
       }
 
       // Helper: draw mini header for subsequent canvas pages
@@ -2991,6 +3095,17 @@ function PrescriptionPage({
               </div>
             ))}
           </div>
+          {/* Vitals Bar */}
+          {vitalsDisplay && (
+            <div className="mt-3 bg-white/10 rounded-lg px-3 py-2">
+              <p className="text-white/60 text-xs uppercase tracking-wide mb-0.5">
+                Vitals
+              </p>
+              <p className="text-white font-semibold text-sm">
+                {vitalsDisplay}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Main Content */}
@@ -3990,6 +4105,7 @@ async function generateReferralPDF(
     referredToDoctor: string;
     referredToDept: string;
     referredToHospital?: string;
+    referralDoctorPhone?: string;
     reason: string;
     urgency: "normal" | "urgent";
     remarks?: string;
@@ -4126,6 +4242,9 @@ async function generateReferralPDF(
   ];
   if (fields.referredToHospital) {
     lines.push(`Hospital / Clinic: ${fields.referredToHospital}`);
+  }
+  if (fields.referralDoctorPhone) {
+    lines.push(`Contact: ${fields.referralDoctorPhone}`);
   }
   lines.push("");
   lines.push("Reason for Referral / Diagnosis:");
@@ -4435,6 +4554,7 @@ function ReferralDialog({
   const [referredToDoctor, setReferredToDoctor] = useState("");
   const [referredToDept, setReferredToDept] = useState("");
   const [referredToHospital, setReferredToHospital] = useState("");
+  const [referralDoctorPhone, setReferralDoctorPhone] = useState("");
   const [reason, setReason] = useState("");
   const [urgency, setUrgency] = useState<"normal" | "urgent">("normal");
   const [remarks, setRemarks] = useState("");
@@ -4446,11 +4566,39 @@ function ReferralDialog({
       setReferredToDoctor("");
       setReferredToDept("");
       setReferredToHospital("");
+      setReferralDoctorPhone("");
       setReason("");
       setUrgency("normal");
       setRemarks("");
     }
   }, [patient]);
+
+  function handleSendWhatsApp() {
+    if (!patient || !referralDoctorPhone) {
+      toast.error("Please enter the referral doctor contact number");
+      return;
+    }
+    const phone = referralDoctorPhone.replace(/\D/g, "");
+    const msg = `Dear ${referredToDoctor || "Doctor"},
+
+We are referring the following patient from Shreeji Clinic:
+
+UID: ${patient.uid}
+Patient: ${patient.name}
+Age/Sex: ${patient.age} yrs / ${patient.sex}
+
+Reason: ${reason}
+
+Referred by: ${doctorName}
+
+Kindly provide expert opinion and management.
+
+Thank you.`;
+    window.open(
+      `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`,
+      "_blank",
+    );
+  }
 
   async function handleGenerate() {
     if (!patient || !referredToDoctor || !referredToDept || !reason) {
@@ -4464,6 +4612,7 @@ function ReferralDialog({
         referredToDoctor,
         referredToDept,
         referredToHospital: referredToHospital || undefined,
+        referralDoctorPhone: referralDoctorPhone || undefined,
         reason,
         urgency,
         remarks: remarks || undefined,
@@ -4541,6 +4690,18 @@ function ReferralDialog({
             />
           </div>
 
+          {/* Referral Doctor Phone */}
+          <div className="space-y-1.5">
+            <Label>Referral Doctor Contact Number</Label>
+            <Input
+              value={referralDoctorPhone}
+              onChange={(e) => setReferralDoctorPhone(e.target.value)}
+              placeholder="e.g. 9876543210"
+              type="tel"
+              data-ocid="referral.doctor_phone_input"
+            />
+          </div>
+
           {/* Reason */}
           <div className="space-y-1.5">
             <Label>
@@ -4592,13 +4753,32 @@ function ReferralDialog({
           </div>
         </div>
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="gap-2 flex-wrap">
           <Button
             variant="outline"
             onClick={onClose}
             data-ocid="referral.cancel_button"
           >
             Cancel
+          </Button>
+          <Button
+            variant="outline"
+            className="gap-2 bg-green-50 hover:bg-green-100 text-green-700 border-green-300"
+            onClick={handleSendWhatsApp}
+            disabled={!referralDoctorPhone}
+            data-ocid="referral.whatsapp_button"
+          >
+            <svg
+              className="w-4 h-4"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              aria-label="WhatsApp"
+              role="img"
+            >
+              <title>WhatsApp</title>
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+            </svg>
+            Send to Doctor
           </Button>
           <Button
             className="gap-2 bg-teal-600 hover:bg-teal-700 text-white"

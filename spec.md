@@ -1,39 +1,32 @@
 # Shreeji Clinic OPD
 
 ## Current State
-The app has Certificate (Rest/Fitness) generation for patients accessible from the Dashboard patient cards. It generates a styled A4 PDF with clinic header, patient info band, certificate body, doctor stamp, and footer.
+Full-featured clinic management app with prescription (stylus + typed), billing, referral letters, certificates, backup/restore, nursing user role, PWA support.
 
 ## Requested Changes (Diff)
 
 ### Add
-- **Referral Letter** feature: A button on the Dashboard patient card (visible to doctors only, not nursing) that opens a `ReferralDialog`.
-- `ReferralDialog` component with fields:
-  - Doctor (referring doctor — Dr. Dhravid Patel / Dr. Zeel Patel)
-  - Referred To Doctor Name (free text input)
-  - Referred To Department / Speciality (free text, e.g. Orthopedics, Cardiology)
-  - Hospital / Clinic Name (free text, optional)
-  - Reason for Referral / Diagnosis (textarea)
-  - Urgency (Normal / Urgent — toggle)
-  - Remarks (optional textarea)
-- `generateReferralPDF` function that creates a styled A4 PDF with:
-  - Same clinic header style as Certificate (blue band, logo 22mm, clinic name, referring doctor name + credentials, date)
-  - Patient info band (UID, Name, Age/Sex, Contact, Date)
-  - "REFERRAL LETTER" title with underline (red)
-  - Body text: "Dear Dr. [RefTo], We are referring our patient [Name], Age [age], UID [uid], for your expert opinion and management. Diagnosis/Reason: [reason]. Urgency: [Normal/Urgent]." etc.
-  - Remarks section if provided
-  - Signature area with referring doctor name, credentials, stamp
-  - Footer: "We listen, We Care, We Heal."
-  - No center watermark (same as certificates)
+1. **Palm rejection / stylus-only mode** on prescription canvas: enable `touch-action: none` with pointer event filtering so only stylus (pointerType === 'pen') strokes are accepted; palm/finger touches are ignored entirely during drawing.
+2. **Referral doctor contact number** field in the referral letter dialog.
+3. **WhatsApp message to referral doctor**: after filling the referral form, a "Send WhatsApp" button opens `https://wa.me/<referralDoctorPhone>?text=<message>` with patient details and referral reason.
+4. **Vitals fields in patient registration** (optional, not mandatory): Blood Pressure, Pulse, SpO2. These fields are stored with the patient visit and shown only on the prescription paper header / PDF — not shown in dashboard or billing.
+5. **Fix download/export/backup on installed PWA**: ensure CSV export, JSON backup, and PDF downloads use Blob + `<a download>` pattern compatible with installed PWA mode; avoid methods that break in standalone mode.
 
 ### Modify
-- `DashboardView` component: Add `onReferral` prop and a "Referral" button (teal/cyan colored) next to the Certificate button for non-nursing users.
-- Main `App` component: Add `referralPatient` state and wire up `ReferralDialog`.
+- Prescription canvas pointer event handler: filter to only process `pointerType === 'pen'` events, ignore `touch` and `mouse` pointer types.
+- Referral dialog: add contact number input field.
+- Referral PDF and WhatsApp message: include referral doctor contact number.
+- Patient registration form: add optional Vitals section (BP, Pulse, SpO2).
+- Prescription paper header / PDF: show vitals if present.
+- All download functions (backup JSON, billing CSV, prescription PDF, bill PDF): use robust Blob URL approach with `URL.createObjectURL` + `a.click()` + `URL.revokeObjectURL`.
 
 ### Remove
-- Nothing
+Nothing removed.
 
 ## Implementation Plan
-1. Add `generateReferralPDF` async function after `generateCertificatePDF`.
-2. Add `ReferralDialog` component after `CertificateDialog`.
-3. Add `onReferral` to `DashboardView` props and add Referral button to patient card action buttons.
-4. Add `referralPatient` state in main App, pass `onReferral` to `DashboardView`, render `<ReferralDialog>`.
+1. Read App.tsx in sections to understand canvas pointer handlers, referral dialog, registration form, and all download functions.
+2. Update canvas `onPointerDown/Move/Up` handlers to check `e.pointerType === 'pen'` and skip otherwise.
+3. Add `referralDoctorPhone` state to referral dialog; add input field; include in PDF and WhatsApp message.
+4. Add optional vitals fields (BP, Pulse, SpO2) to registration and follow-up forms; store in patient/visit data; display on prescription paper header and in PDF.
+5. Audit all download/export/backup calls and replace any `window.open`, `document.execCommand`, or problematic patterns with `URL.createObjectURL(blob)` + hidden anchor click + `revokeObjectURL`.
+6. Validate and deploy.
