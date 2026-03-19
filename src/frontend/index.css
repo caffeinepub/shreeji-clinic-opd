@@ -43,9 +43,9 @@
     --secondary-foreground: 0.28 0.08 255;
 
     --muted: 0.94 0.01 20;
-    --muted-foreground: 0.50 0.04 255;
+    --muted-foreground: 0.5 0.04 255;
 
-    --accent: 0.90 0.04 255;
+    --accent: 0.9 0.04 255;
     --accent-foreground: 0.22 0.12 255;
 
     --destructive: 0.55 0.24 27;
@@ -60,19 +60,19 @@
     --clinic-red: 0.58 0.24 27;
     --clinic-red-light: 0.92 0.06 27;
     /* clinic-blue: royal blue of the cross arm and text */
-    --clinic-blue: 0.40 0.20 255;
-    --clinic-blue-light: 0.90 0.06 255;
+    --clinic-blue: 0.4 0.2 255;
+    --clinic-blue-light: 0.9 0.06 255;
 
     /* Keep teal as alias of blue for backward compat */
-    --clinic-teal: 0.40 0.20 255;
-    --clinic-teal-light: 0.90 0.06 255;
+    --clinic-teal: 0.4 0.2 255;
+    --clinic-teal-light: 0.9 0.06 255;
     --clinic-sky: 0.65 0.12 255;
 
     --chart-1: 0.58 0.24 27;
-    --chart-2: 0.40 0.20 255;
+    --chart-2: 0.4 0.2 255;
     --chart-3: 0.52 0.16 255;
     --chart-4: 0.72 0.16 84;
-    --chart-5: 0.65 0.20 27;
+    --chart-5: 0.65 0.2 27;
 
     --sidebar: 0.96 0.015 255;
     --sidebar-foreground: 0.15 0.025 255;
@@ -164,7 +164,11 @@
 
   /* Brand gradient: royal blue left → red right (logo colors) */
   .print-header {
-    background: linear-gradient(135deg, oklch(0.32 0.20 255) 0%, oklch(0.48 0.22 27) 100%);
+    background: linear-gradient(
+      135deg,
+      oklch(0.32 0.2 255) 0%,
+      oklch(0.48 0.22 27) 100%
+    );
     color: white;
     padding: 8mm 8mm 5mm;
     -webkit-print-color-adjust: exact;
@@ -301,8 +305,8 @@
   .clinic-header-gradient {
     background: linear-gradient(
       135deg,
-      oklch(0.32 0.20 255) 0%,
-      oklch(0.50 0.22 27) 100%
+      oklch(0.32 0.2 255) 0%,
+      oklch(0.5 0.22 27) 100%
     );
   }
 
@@ -312,8 +316,7 @@
 
   .prescription-paper {
     background: white;
-    box-shadow:
-      0 4px 6px -1px rgba(0, 0, 0, 0.05),
-      0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px
+      rgba(0, 0, 0, 0.03);
   }
 }

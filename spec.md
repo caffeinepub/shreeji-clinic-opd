@@ -1,32 +1,30 @@
 # Shreeji Clinic OPD
 
 ## Current State
-Full-featured clinic management app with prescription (stylus + typed), billing, referral letters, certificates, backup/restore, nursing user role, PWA support.
+The app stores patient basic records in the ICP backend, but prescription history, billing records, doctor accounts, nursing accounts, and UID counters are stored only in localStorage — making data inaccessible when switching devices.
 
 ## Requested Changes (Diff)
 
 ### Add
-1. **Palm rejection / stylus-only mode** on prescription canvas: enable `touch-action: none` with pointer event filtering so only stylus (pointerType === 'pen') strokes are accepted; palm/finger touches are ignored entirely during drawing.
-2. **Referral doctor contact number** field in the referral letter dialog.
-3. **WhatsApp message to referral doctor**: after filling the referral form, a "Send WhatsApp" button opens `https://wa.me/<referralDoctorPhone>?text=<message>` with patient details and referral reason.
-4. **Vitals fields in patient registration** (optional, not mandatory): Blood Pressure, Pulse, SpO2. These fields are stored with the patient visit and shown only on the prescription paper header / PDF — not shown in dashboard or billing.
-5. **Fix download/export/backup on installed PWA**: ensure CSV export, JSON backup, and PDF downloads use Blob + `<a download>` pattern compatible with installed PWA mode; avoid methods that break in standalone mode.
+- Backend stable storage for prescription history (per patient, keyed by uid)
+- Backend stable storage for billing records (per patient, keyed by uid)
+- Backend stable storage for doctor accounts (userId, passwordHash, displayName)
+- Backend stable storage for nursing accounts (userId, passwordHash, displayName)
+- Backend stable storage for UID counter (per MMYY key)
+- Backend query/update functions for all new data types
+- Frontend sync: all writes go to backend + localStorage; on app load, fetch everything from backend as source of truth
 
 ### Modify
-- Prescription canvas pointer event handler: filter to only process `pointerType === 'pen'` events, ignore `touch` and `mouse` pointer types.
-- Referral dialog: add contact number input field.
-- Referral PDF and WhatsApp message: include referral doctor contact number.
-- Patient registration form: add optional Vitals section (BP, Pulse, SpO2).
-- Prescription paper header / PDF: show vitals if present.
-- All download functions (backup JSON, billing CSV, prescription PDF, bill PDF): use robust Blob URL approach with `URL.createObjectURL` + `a.click()` + `URL.revokeObjectURL`.
+- Patient record in backend to include vitals (bp, pulse, spo2) fields
+- App startup: load all data from backend, merge with local cache
+- Registration, prescription save, billing save, account management — all sync to backend
 
 ### Remove
-Nothing removed.
+- Nothing removed from existing frontend features
 
 ## Implementation Plan
-1. Read App.tsx in sections to understand canvas pointer handlers, referral dialog, registration form, and all download functions.
-2. Update canvas `onPointerDown/Move/Up` handlers to check `e.pointerType === 'pen'` and skip otherwise.
-3. Add `referralDoctorPhone` state to referral dialog; add input field; include in PDF and WhatsApp message.
-4. Add optional vitals fields (BP, Pulse, SpO2) to registration and follow-up forms; store in patient/visit data; display on prescription paper header and in PDF.
-5. Audit all download/export/backup calls and replace any `window.open`, `document.execCommand`, or problematic patterns with `URL.createObjectURL(blob)` + hidden anchor click + `revokeObjectURL`.
-6. Validate and deploy.
+1. Extend Motoko backend with stable maps for: prescriptions, bills, doctorAccounts, nursingAccounts, uidCounters
+2. Add CRUD functions for each new data type
+3. Update frontend to sync all data to/from backend on every read/write operation
+4. On app load, pull all data from backend and update localStorage as local cache
+5. Ensure offline fallback: if backend call fails, use localStorage data

@@ -83,6 +83,10 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
+// Module-level actor ref for fire-and-forget backend sync across all functions
+// eslint-disable-next-line prefer-const
+let _cloudActor: any = null;
+
 import type { Patient } from "./backend.d.ts";
 import {
   type AuthSession,
@@ -284,6 +288,9 @@ function generateUID(): string {
       if (Number.isNaN(counter) || counter < 1) counter = 1;
     }
     localStorage.setItem(counterKey, String(counter));
+    if (_cloudActor) {
+      _cloudActor.setUidCounter(`${yy}${mm}`, counter).catch(() => {});
+    }
   } catch {
     counter = 1;
   }
@@ -353,6 +360,9 @@ function savePrescriptionHistory(
   records: PrescriptionRecord[],
 ): void {
   localStorage.setItem(`shreeji_rx_history_${uid}`, JSON.stringify(records));
+  if (_cloudActor) {
+    _cloudActor.savePrescriptions(uid, JSON.stringify(records)).catch(() => {});
+  }
 }
 
 function loadBills(uid: string): Bill[] {
@@ -366,6 +376,9 @@ function loadBills(uid: string): Bill[] {
 
 function saveBills(uid: string, bills: Bill[]): void {
   localStorage.setItem(`shreeji_bills_${uid}`, JSON.stringify(bills));
+  if (_cloudActor) {
+    _cloudActor.saveBills(uid, JSON.stringify(bills)).catch(() => {});
+  }
 }
 
 // ── Backup helpers ─────────────────────────────────────────────────────────
@@ -397,7 +410,9 @@ function exportBackup(patients: LocalPatient[]): void {
   a.href = url;
   const dateStr = new Date().toISOString().slice(0, 10);
   a.download = `shreeji-clinic-backup-${dateStr}.json`;
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
   URL.revokeObjectURL(url);
   toast.success("Backup file downloaded successfully");
 }
@@ -428,7 +443,7 @@ function importBackupFile(
           data.prescriptionHistories,
         )) {
           if (Array.isArray(history)) {
-            savePrescriptionHistory(uid, history);
+            savePrescriptionHistory(uid, history as PrescriptionRecord[]);
           }
         }
       }
@@ -5691,6 +5706,14 @@ function ManageNursingUsersDialog({
     }
 
     saveNursingAccounts(updated);
+    // Sync to cloud
+    if (_cloudActor) {
+      for (const acc of updated) {
+        _cloudActor
+          .saveAccount(acc.userId, JSON.stringify({ ...acc, role: "nursing" }))
+          .catch(() => {});
+      }
+    }
     setAccounts(updated);
     setShowAddForm(false);
     setEditingAccount(null);
@@ -5702,6 +5725,9 @@ function ManageNursingUsersDialog({
   function handleDelete(userId: string) {
     const updated = accounts.filter((a) => a.userId !== userId);
     saveNursingAccounts(updated);
+    if (_cloudActor) {
+      _cloudActor.deleteAccount(userId).catch(() => {});
+    }
     setAccounts(updated);
     if (editingAccount?.userId === userId) {
       setEditingAccount(null);
@@ -5988,6 +6014,14 @@ function ChangeProfileDialog({
       const updatedAccounts = [...accounts];
       updatedAccounts[accountIndex] = updatedAccount;
       saveAccounts(updatedAccounts);
+      if (_cloudActor) {
+        _cloudActor
+          .saveAccount(
+            updatedAccount.userId,
+            JSON.stringify({ ...updatedAccount, role: "doctor" }),
+          )
+          .catch(() => {});
+      }
 
       // Update session
       const updatedSession: AuthSession = {
@@ -6254,42 +6288,139 @@ function AppShell({
   // ── Lifted data action refs (for header menu) ─────────────────────────────
   const headerRestoreInputRef = useRef<HTMLInputElement>(null);
 
-  // Fetch from backend — MERGE with localStorage, never overwrite with empty
+  // Set module-level actor ref for fire-and-forget backend sync
+  useEffect(() => {
+    _cloudActor = actor;
+  }, [actor]);
+
+  // Fetch from backend on startup — loads ALL cloud data, merges with localStorage
   const { isLoading: backendLoading } = useQuery({
-    queryKey: ["patients"],
+    queryKey: ["appState"],
     queryFn: async () => {
-      if (!actor) return localPatients;
+      if (!actor) return null;
       try {
-        const backendPatients = await actor.getAllPatients();
-        const backendLocal = backendPatients.map(toLocalPatient);
-        // Merge: start with current local, override with backend data per UID
-        // then add any backend patients not in local
+        // Init default accounts on first run
+        (actor as any).initDefaultAccounts().catch(() => {});
+
+        const appState = await (actor as any).getAppState();
+
+        // ── Patients ──────────────────────────────────────────────────────
+        const cloudPatients: LocalPatient[] = (appState.patients || []).map(
+          toLocalPatient,
+        );
         setLocalPatients((prevLocal) => {
-          const localMap = new Map(prevLocal.map((p) => [p.uid, p]));
-          for (const bp of backendLocal) {
-            localMap.set(bp.uid, bp);
+          const localMap = new Map(
+            prevLocal.map((p: LocalPatient) => [p.uid, p]),
+          );
+          for (const cp of cloudPatients) {
+            // Merge patient extras (vitals) from cloud into patient record
+            localMap.set(cp.uid, cp);
           }
-          const merged = Array.from(localMap.values());
-          // Sync any local-only patients back to backend
-          if (actor) {
-            for (const lp of prevLocal) {
-              const existsInBackend = backendLocal.some(
-                (bp) => bp.uid === lp.uid,
-              );
-              if (!existsInBackend) {
-                actor.register(toBackendPatient(lp)).catch(() => {});
-              }
+          // Sync any local-only patients to backend
+          for (const lp of prevLocal) {
+            if (!cloudPatients.some((cp) => cp.uid === lp.uid)) {
+              actor.register(toBackendPatient(lp)).catch(() => {});
             }
           }
+          const merged = Array.from(localMap.values());
           saveLocalPatients(merged);
           return merged;
         });
-        return backendLocal;
+
+        // ── Patient Extras (vitals) ────────────────────────────────────────
+        for (const [uid, extrasJson] of appState.patientExtras || []) {
+          try {
+            const extras = JSON.parse(extrasJson as string);
+            // Merge vitals into the patient record already in localStorage
+            const patients = loadLocalPatients();
+            const updated = patients.map((p: LocalPatient) => {
+              if (p.uid === uid && extras) {
+                return {
+                  ...p,
+                  vitals: {
+                    bp: extras.vitalsBp || "",
+                    pulse: extras.vitalsPulse || "",
+                    spo2: extras.vitalsSpo2 || "",
+                  },
+                };
+              }
+              return p;
+            });
+            saveLocalPatients(updated);
+          } catch {
+            /* ignore */
+          }
+        }
+
+        // ── Prescriptions ────────────────────────────────────────────────
+        for (const [uid, rxJson] of appState.prescriptions || []) {
+          try {
+            const existing = localStorage.getItem(`shreeji_rx_history_${uid}`);
+            const cloudRecords = JSON.parse(rxJson as string);
+            if (!existing || cloudRecords.length > 0) {
+              localStorage.setItem(
+                `shreeji_rx_history_${uid}`,
+                rxJson as string,
+              );
+            }
+          } catch {
+            /* ignore */
+          }
+        }
+
+        // ── Bills ────────────────────────────────────────────────────────
+        for (const [uid, billsJson] of appState.bills || []) {
+          try {
+            const existing = localStorage.getItem(`shreeji_bills_${uid}`);
+            const cloudBills = JSON.parse(billsJson as string);
+            if (!existing || cloudBills.length > 0) {
+              localStorage.setItem(`shreeji_bills_${uid}`, billsJson as string);
+            }
+          } catch {
+            /* ignore */
+          }
+        }
+
+        // ── Accounts ────────────────────────────────────────────────────
+        if ((appState.accounts || []).length > 0) {
+          const doctorAccounts: any[] = [];
+          const nursingAccounts: any[] = [];
+          for (const [, accountJson] of appState.accounts) {
+            try {
+              const acc = JSON.parse(accountJson as string);
+              if (acc.role === "nursing") nursingAccounts.push(acc);
+              else doctorAccounts.push(acc);
+            } catch {
+              /* ignore */
+            }
+          }
+          if (doctorAccounts.length > 0) {
+            localStorage.setItem(
+              "shreeji_doctor_accounts",
+              JSON.stringify(doctorAccounts),
+            );
+          }
+          if (nursingAccounts.length > 0) {
+            localStorage.setItem(
+              "shreeji_nursing_accounts",
+              JSON.stringify(nursingAccounts),
+            );
+          }
+        }
+
+        // ── UID Counters ────────────────────────────────────────────────
+        for (const [key, value] of appState.uidCounters || []) {
+          localStorage.setItem(`shreeji_uid_counter_${key}`, String(value));
+        }
+
+        return appState;
       } catch {
-        return localPatients;
+        return null;
       }
     },
     enabled: !!actor && !isFetching,
+    staleTime: Number.POSITIVE_INFINITY,
+    retry: 2,
   });
 
   const registerMutation = useMutation({
@@ -6309,6 +6440,19 @@ function AppShell({
         } catch {
           // local save already succeeded — backend will sync later
         }
+      }
+      // Sync patient vitals/extras to cloud
+      if (_cloudActor && patient.vitals) {
+        _cloudActor
+          .savePatientExtras(
+            patient.uid,
+            JSON.stringify({
+              vitalsBp: patient.vitals.bp || "",
+              vitalsPulse: patient.vitals.pulse || "",
+              vitalsSpo2: patient.vitals.spo2 || "",
+            }),
+          )
+          .catch(() => {});
       }
     },
   });
@@ -6334,6 +6478,19 @@ function AppShell({
             // local save already succeeded
           }
         }
+      }
+      // Sync patient vitals/extras to cloud
+      if (_cloudActor && patient.vitals) {
+        _cloudActor
+          .savePatientExtras(
+            patient.uid,
+            JSON.stringify({
+              vitalsBp: patient.vitals.bp || "",
+              vitalsPulse: patient.vitals.pulse || "",
+              vitalsSpo2: patient.vitals.spo2 || "",
+            }),
+          )
+          .catch(() => {});
       }
     },
   });
@@ -6387,6 +6544,33 @@ function AppShell({
     [updateMutation],
   );
 
+  // ── Auto-backup at 9:00 PM daily ──
+  useEffect(() => {
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    const now = new Date();
+    const next9pm = new Date();
+    next9pm.setHours(21, 0, 0, 0);
+    if (now >= next9pm) {
+      next9pm.setDate(next9pm.getDate() + 1);
+    }
+    const msUntil9pm = next9pm.getTime() - now.getTime();
+    const timeoutId = setTimeout(() => {
+      exportBackup(loadLocalPatients());
+      toast.success("Auto backup downloaded at 9:00 PM");
+      intervalId = setInterval(
+        () => {
+          exportBackup(loadLocalPatients());
+          toast.success("Auto backup downloaded at 9:00 PM");
+        },
+        24 * 60 * 60 * 1000,
+      );
+    }, msUntil9pm);
+    return () => {
+      clearTimeout(timeoutId);
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, []);
+
   // ── Lifted export / backup / restore (called from both header and dashboard) ──
   function handleExportExcel() {
     const headers = [
@@ -6417,7 +6601,9 @@ function AppShell({
     const a = document.createElement("a");
     a.href = url;
     a.download = `shreeji-clinic-patients-${todayStr()}.csv`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
     toast.success("CSV file exported successfully");
   }
@@ -6585,7 +6771,9 @@ function AppShell({
     const a = document.createElement("a");
     a.href = url;
     a.download = `shreeji-billing-report-${todayStr()}.csv`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
     toast.success(
       `Billing report exported — ${allRows.length} row(s) across ${localPatients.length} patient(s)`,
@@ -6610,6 +6798,7 @@ function AppShell({
   }
 
   const isLoading = backendLoading && localPatients.length === 0;
+  const isSyncing = backendLoading && localPatients.length > 0;
   const isNursing = session.role === "nursing";
 
   // Shared action props used by both Header and FrontDeskPage
@@ -6715,6 +6904,14 @@ function AppShell({
         session={session}
         {...sharedActions}
       />
+
+      {/* Cloud sync indicator */}
+      {isSyncing && (
+        <div className="no-print bg-blue-50 border-b border-blue-200 px-4 py-2 flex items-center gap-2 text-blue-700 text-sm">
+          <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
+          <span>Syncing data from cloud...</span>
+        </div>
+      )}
 
       <main className="flex-1">
         {page === "dashboard" && (
