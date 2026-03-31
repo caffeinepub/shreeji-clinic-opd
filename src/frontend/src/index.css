@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0.98 0.005 240;
+    --foreground: 0.15 0.02 240;
+    --card: 1 0 0;
+    --card-foreground: 0.15 0.02 240;
+    --popover: 1 0 0;
+    --popover-foreground: 0.15 0.02 240;
+    --primary: 0.38 0.12 255;
+    --primary-foreground: 1 0 0;
+    --secondary: 0.94 0.01 240;
+    --secondary-foreground: 0.2 0.02 240;
+    --muted: 0.94 0.01 240;
+    --muted-foreground: 0.5 0.02 240;
+    --accent: 0.92 0.02 240;
+    --accent-foreground: 0.15 0.02 240;
+    --destructive: 0.55 0.22 25;
+    --destructive-foreground: 1 0 0;
+    --border: 0.88 0.01 240;
+    --input: 0.88 0.01 240;
+    --ring: 0.38 0.12 255;
+    --radius: 0.5rem;
+    --chart-1: 0.38 0.12 255;
+    --chart-2: 0.55 0.15 160;
+    --chart-3: 0.55 0.18 30;
+    --chart-4: 0.55 0.15 290;
+    --chart-5: 0.55 0.18 60;
+
+    /* Shreeji Clinic brand colors — royal blue + bold red */
+    /* Royal blue: #1a3f9f approx */
+    --clinic-blue: 0.38 0.18 264;
+    --clinic-blue-light: 0.92 0.06 264;
+    /* Bold red: #c8102e approx */
+    --clinic-red: 0.52 0.22 27;
+    --clinic-red-light: 0.94 0.05 27;
+    /* Sky alias */
+    --clinic-sky: 0.72 0.12 240;
+    /* Teal alias → maps to blue */
+    --clinic-teal: 0.38 0.18 264;
+    --clinic-teal-light: 0.92 0.06 264;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer utilities {
+  .clinic-header-gradient {
+    background: linear-gradient(
+      135deg,
+      oklch(0.38 0.18 264) 0%,
+      oklch(0.52 0.22 27) 100%
+    );
+  }
+}

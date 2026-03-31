@@ -343,7 +343,11 @@ function loadLocalPatients(): LocalPatient[] {
 }
 
 function saveLocalPatients(patients: LocalPatient[]): void {
-  localStorage.setItem("shreeji_patients", JSON.stringify(patients));
+  try {
+    localStorage.setItem("shreeji_patients", JSON.stringify(patients));
+  } catch (e) {
+    console.warn("localStorage quota exceeded:", e);
+  }
 }
 
 function loadPrescriptionHistory(uid: string): PrescriptionRecord[] {
@@ -359,7 +363,11 @@ function savePrescriptionHistory(
   uid: string,
   records: PrescriptionRecord[],
 ): void {
-  localStorage.setItem(`shreeji_rx_history_${uid}`, JSON.stringify(records));
+  try {
+    localStorage.setItem(`shreeji_rx_history_${uid}`, JSON.stringify(records));
+  } catch (e) {
+    console.warn("localStorage quota exceeded:", e);
+  }
   if (_cloudActor) {
     _cloudActor.savePrescriptions(uid, JSON.stringify(records)).catch(() => {});
   }
@@ -375,7 +383,11 @@ function loadBills(uid: string): Bill[] {
 }
 
 function saveBills(uid: string, bills: Bill[]): void {
-  localStorage.setItem(`shreeji_bills_${uid}`, JSON.stringify(bills));
+  try {
+    localStorage.setItem(`shreeji_bills_${uid}`, JSON.stringify(bills));
+  } catch (e) {
+    console.warn("localStorage quota exceeded:", e);
+  }
   if (_cloudActor) {
     _cloudActor.saveBills(uid, JSON.stringify(bills)).catch(() => {});
   }
@@ -388,6 +400,7 @@ interface BackupData {
   exportedAt: string;
   patients: LocalPatient[];
   prescriptionHistories: Record<string, PrescriptionRecord[]>;
+  bills?: Record<string, any[]>;
 }
 
 function exportBackup(patients: LocalPatient[]): void {
@@ -396,11 +409,22 @@ function exportBackup(patients: LocalPatient[]): void {
     const h = loadPrescriptionHistory(p.uid);
     if (h.length > 0) histories[p.uid] = h;
   }
+  const bills: Record<string, any[]> = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key?.startsWith("shreeji_bills_")) {
+      const uid = key.replace("shreeji_bills_", "");
+      try {
+        bills[uid] = JSON.parse(localStorage.getItem(key) || "[]");
+      } catch {}
+    }
+  }
   const backup: BackupData = {
     version: 1,
     exportedAt: new Date().toISOString(),
     patients,
     prescriptionHistories: histories,
+    bills,
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], {
     type: "application/json;charset=utf-8;",
@@ -410,10 +434,11 @@ function exportBackup(patients: LocalPatient[]): void {
   a.href = url;
   const dateStr = new Date().toISOString().slice(0, 10);
   a.download = `shreeji-clinic-backup-${dateStr}.json`;
+  a.style.display = "none";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
   toast.success("Backup file downloaded successfully");
 }
 
@@ -445,6 +470,17 @@ function importBackupFile(
           if (Array.isArray(history)) {
             savePrescriptionHistory(uid, history as PrescriptionRecord[]);
           }
+        }
+      }
+      // Restore bills
+      if (data.bills) {
+        for (const [uid, billList] of Object.entries(data.bills)) {
+          try {
+            localStorage.setItem(
+              `shreeji_bills_${uid}`,
+              JSON.stringify(billList),
+            );
+          } catch {}
         }
       }
       onImport(merged);
@@ -1629,6 +1665,7 @@ function DrawingCanvas({
     e.preventDefault();
     pushSnapshot();
     isDrawing.current = true;
+    (e.currentTarget as HTMLCanvasElement).setPointerCapture(e.pointerId);
     lastPoint.current = getPos(e);
     const canvas = canvasRef.current!;
     const ctx = canvas.getContext("2d")!;
@@ -1680,6 +1717,9 @@ function DrawingCanvas({
     if (locked) return;
     if (e.pointerType !== "pen") return;
     e.preventDefault();
+    if (isDrawing.current && canvasRef.current) {
+      onSnapshot(canvasRef.current.toDataURL("image/png"));
+    }
     isDrawing.current = false;
     lastPoint.current = null;
   }
@@ -2319,18 +2359,28 @@ function FollowUpDialog({
   patient: LocalPatient | null;
   open: boolean;
   onClose: () => void;
-  onConfirm: (followUpDate: string, doctorName: string) => void;
+  onConfirm: (
+    followUpDate: string,
+    doctorName: string,
+    vitals: { bp: string; pulse: string; spo2: string },
+  ) => void;
 }) {
   const [followUpDate, setFollowUpDate] = useState(todayStr());
   const [doctorName, setDoctorName] = useState(
     patient?.doctorName ?? "Dr. Dhravid Patel",
   );
+  const [vitals, setVitals] = useState({ bp: "", pulse: "", spo2: "" });
 
   // Sync doctor name when patient changes
   useEffect(() => {
     if (patient) {
       setDoctorName(patient.doctorName);
       setFollowUpDate(todayStr());
+      setVitals({
+        bp: patient.vitals?.bp ?? "",
+        pulse: patient.vitals?.pulse ?? "",
+        spo2: patient.vitals?.spo2 ?? "",
+      });
     }
   }, [patient]);
 
@@ -2339,7 +2389,7 @@ function FollowUpDialog({
       toast.error("Please select a follow-up date");
       return;
     }
-    onConfirm(followUpDate, doctorName);
+    onConfirm(followUpDate, doctorName, vitals);
   }
 
   return (
@@ -2398,6 +2448,54 @@ function FollowUpDialog({
                   <SelectItem value="Dr. Zeel Patel">Dr. Zeel Patel</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Vitals (Optional) */}
+            <div className="space-y-3 border border-border rounded-lg p-4">
+              <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                Vitals{" "}
+                <span className="font-normal normal-case text-xs">
+                  (Optional — shown on prescription)
+                </span>
+              </p>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="followup-bp">Blood Pressure</Label>
+                  <Input
+                    id="followup-bp"
+                    placeholder="120/80 mmHg"
+                    value={vitals.bp}
+                    onChange={(e) =>
+                      setVitals({ ...vitals, bp: e.target.value })
+                    }
+                    data-ocid="followup.bp_input"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="followup-pulse">Pulse</Label>
+                  <Input
+                    id="followup-pulse"
+                    placeholder="72 bpm"
+                    value={vitals.pulse}
+                    onChange={(e) =>
+                      setVitals({ ...vitals, pulse: e.target.value })
+                    }
+                    data-ocid="followup.pulse_input"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="followup-spo2">SpO2</Label>
+                  <Input
+                    id="followup-spo2"
+                    placeholder="98%"
+                    value={vitals.spo2}
+                    onChange={(e) =>
+                      setVitals({ ...vitals, spo2: e.target.value })
+                    }
+                    data-ocid="followup.spo2_input"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -2843,7 +2941,6 @@ function PrescriptionPage({
           const wmY = pageContentY + (A4_H - pageContentY - wmSize) / 2;
           // jsPDF doesn't support native transparency for images, so we use a
           // small GState workaround via internal API if available, otherwise skip
-          // biome-ignore lint/suspicious/noExplicitAny: jsPDF internal
           const pdfAny = pdf as any;
           if (
             pdfAny.saveGraphicsState &&
@@ -2855,10 +2952,8 @@ function PrescriptionPage({
             pdfAny.setGState(new pdfAny.GState({ opacity: 0.12 }));
             pdf.addImage(logoBase64, "PNG", wmX, wmY, wmSize, wmSize);
             pdfAny.restoreGraphicsState();
-          } else {
-            // Fallback: draw without transparency (still centered)
-            pdf.addImage(logoBase64, "PNG", wmX, wmY, wmSize, wmSize);
           }
+          // If no GState support, skip watermark rather than drawing opaque
         } catch {
           /* skip watermark if anything fails */
         }
@@ -2884,7 +2979,6 @@ function PrescriptionPage({
           { label: "Next Visit", value: typedContent.nextVisit },
         ].filter((s) => s.value.trim());
 
-        // biome-ignore lint/suspicious/noExplicitAny: jsPDF internal
         const pdfAny = pdf as any;
         for (const section of typedSections) {
           // Section label band
@@ -3030,7 +3124,10 @@ function PrescriptionPage({
       }
 
       // Add footer to every page
-      const totalPDFPages = (pdf as any).internal?.getNumberOfPages?.() ?? 1;
+      const totalPDFPages =
+        (pdf as any).getNumberOfPages?.() ??
+        (pdf as any).internal?.getNumberOfPages?.() ??
+        1;
       for (let p = 1; p <= totalPDFPages; p++) {
         (pdf as any).setPage(p);
         const footerH = 12;
@@ -3452,14 +3549,13 @@ function PrescriptionPage({
 // ── Doctor credentials helper ──────────────────────────────────────────────
 
 function getDoctorCredentials(doctorName: string): string {
-  if (doctorName === "Dr. Dhravid Patel") return "BHMS, CCH  G-32387";
-  if (doctorName === "Dr. Zeel Patel") return "BHMS, CCH  G-34069";
+  if (doctorName === "Dr. Dhravid Patel") return "BHMS, CCH G-32387";
+  if (doctorName === "Dr. Zeel Patel") return "BHMS, CCH G-34069";
   return "";
 }
 
 // ── jsPDF CDN loader ───────────────────────────────────────────────────────
 
-// biome-ignore lint/suspicious/noExplicitAny: jsPDF loaded from CDN
 type JsPDFClass = new (options?: {
   orientation?: string;
   unit?: string;
@@ -3487,7 +3583,6 @@ let _jsPDFLoaded = false;
 async function loadJsPDF(): Promise<JsPDFClass> {
   if (!_jsPDFLoaded) {
     await new Promise<void>((resolve, reject) => {
-      // biome-ignore lint/suspicious/noExplicitAny: CDN global check
       const win = window as any;
       if (win.jspdf || win.jsPDF) {
         _jsPDFLoaded = true;
@@ -3505,7 +3600,6 @@ async function loadJsPDF(): Promise<JsPDFClass> {
       document.head.appendChild(script);
     });
   }
-  // biome-ignore lint/suspicious/noExplicitAny: CDN global
   const win = window as any;
   return (win.jspdf?.jsPDF ?? win.jsPDF) as JsPDFClass;
 }
@@ -3673,7 +3767,6 @@ async function generateBillPDF(
       const wmSize = 80; // mm — matches user requirement
       const wmX = (A4_W - wmSize) / 2;
       const wmY = (A4_H - wmSize) / 2;
-      // biome-ignore lint/suspicious/noExplicitAny: jsPDF internal
       const pdfAny = pdf as any;
       if (
         pdfAny.saveGraphicsState &&
@@ -6355,13 +6448,37 @@ function AppShell({
         // ── Prescriptions ────────────────────────────────────────────────
         for (const [uid, rxJson] of appState.prescriptions || []) {
           try {
-            const existing = localStorage.getItem(`shreeji_rx_history_${uid}`);
+            const existingLocal = localStorage.getItem(
+              `shreeji_rx_history_${uid}`,
+            );
             const cloudRecords = JSON.parse(rxJson as string);
-            if (!existing || cloudRecords.length > 0) {
+            if (
+              !existingLocal ||
+              existingLocal === "[]" ||
+              existingLocal === "null"
+            ) {
               localStorage.setItem(
                 `shreeji_rx_history_${uid}`,
                 rxJson as string,
               );
+            } else {
+              // Merge: take union by timestamp
+              const localRecords = JSON.parse(existingLocal);
+              const localTimes = new Set(
+                localRecords.map((r: any) => r.timestamp || r.date),
+              );
+              const merged = [
+                ...localRecords,
+                ...cloudRecords.filter(
+                  (r: any) => !localTimes.has(r.timestamp || r.date),
+                ),
+              ];
+              try {
+                localStorage.setItem(
+                  `shreeji_rx_history_${uid}`,
+                  JSON.stringify(merged),
+                );
+              } catch {}
             }
           } catch {
             /* ignore */
@@ -6371,10 +6488,33 @@ function AppShell({
         // ── Bills ────────────────────────────────────────────────────────
         for (const [uid, billsJson] of appState.bills || []) {
           try {
-            const existing = localStorage.getItem(`shreeji_bills_${uid}`);
+            const existingLocal = localStorage.getItem(`shreeji_bills_${uid}`);
             const cloudBills = JSON.parse(billsJson as string);
-            if (!existing || cloudBills.length > 0) {
-              localStorage.setItem(`shreeji_bills_${uid}`, billsJson as string);
+            if (
+              !existingLocal ||
+              existingLocal === "[]" ||
+              existingLocal === "null"
+            ) {
+              try {
+                localStorage.setItem(
+                  `shreeji_bills_${uid}`,
+                  billsJson as string,
+                );
+              } catch {}
+            } else {
+              // Merge: take union by billId
+              const localBills = JSON.parse(existingLocal);
+              const localIds = new Set(localBills.map((b: any) => b.billId));
+              const merged = [
+                ...localBills,
+                ...cloudBills.filter((b: any) => !localIds.has(b.billId)),
+              ];
+              try {
+                localStorage.setItem(
+                  `shreeji_bills_${uid}`,
+                  JSON.stringify(merged),
+                );
+              } catch {}
             }
           } catch {
             /* ignore */
@@ -6395,22 +6535,28 @@ function AppShell({
             }
           }
           if (doctorAccounts.length > 0) {
-            localStorage.setItem(
-              "shreeji_doctor_accounts",
-              JSON.stringify(doctorAccounts),
-            );
+            try {
+              localStorage.setItem(
+                "shreeji_doctor_accounts",
+                JSON.stringify(doctorAccounts),
+              );
+            } catch {}
           }
           if (nursingAccounts.length > 0) {
-            localStorage.setItem(
-              "shreeji_nursing_accounts",
-              JSON.stringify(nursingAccounts),
-            );
+            try {
+              localStorage.setItem(
+                "shreeji_nursing_accounts",
+                JSON.stringify(nursingAccounts),
+              );
+            } catch {}
           }
         }
 
         // ── UID Counters ────────────────────────────────────────────────
         for (const [key, value] of appState.uidCounters || []) {
-          localStorage.setItem(`shreeji_uid_counter_${key}`, String(value));
+          try {
+            localStorage.setItem(`shreeji_uid_counter_${key}`, String(value));
+          } catch {}
         }
 
         return appState;
@@ -6442,14 +6588,14 @@ function AppShell({
         }
       }
       // Sync patient vitals/extras to cloud
-      if (_cloudActor && patient.vitals) {
+      if (_cloudActor) {
         _cloudActor
           .savePatientExtras(
             patient.uid,
             JSON.stringify({
-              vitalsBp: patient.vitals.bp || "",
-              vitalsPulse: patient.vitals.pulse || "",
-              vitalsSpo2: patient.vitals.spo2 || "",
+              vitalsBp: patient.vitals?.bp || "",
+              vitalsPulse: patient.vitals?.pulse || "",
+              vitalsSpo2: patient.vitals?.spo2 || "",
             }),
           )
           .catch(() => {});
@@ -6480,14 +6626,14 @@ function AppShell({
         }
       }
       // Sync patient vitals/extras to cloud
-      if (_cloudActor && patient.vitals) {
+      if (_cloudActor) {
         _cloudActor
           .savePatientExtras(
             patient.uid,
             JSON.stringify({
-              vitalsBp: patient.vitals.bp || "",
-              vitalsPulse: patient.vitals.pulse || "",
-              vitalsSpo2: patient.vitals.spo2 || "",
+              vitalsBp: patient.vitals?.bp || "",
+              vitalsPulse: patient.vitals?.pulse || "",
+              vitalsSpo2: patient.vitals?.spo2 || "",
             }),
           )
           .catch(() => {});
@@ -6596,15 +6742,18 @@ function AppShell({
         row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","),
       )
       .join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob([`\uFEFF${csvContent}`], {
+      type: "text/csv;charset=utf-8;",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = `shreeji-clinic-patients-${todayStr()}.csv`;
+    a.style.display = "none";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
     toast.success("CSV file exported successfully");
   }
 
@@ -6771,10 +6920,11 @@ function AppShell({
     const a = document.createElement("a");
     a.href = url;
     a.download = `shreeji-billing-report-${todayStr()}.csv`;
+    a.style.display = "none";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
     toast.success(
       `Billing report exported — ${allRows.length} row(s) across ${localPatients.length} patient(s)`,
     );
@@ -6990,12 +7140,13 @@ function AppShell({
           setFollowUpDialogOpen(false);
           setFollowUpTarget(null);
         }}
-        onConfirm={(date, doctor) => {
+        onConfirm={(date, doctor, newVitals) => {
           if (!followUpTarget) return;
           // Use the same patient but with the chosen doctor for this visit
           const patientForFollowUp: LocalPatient = {
             ...followUpTarget,
             doctorName: doctor,
+            vitals: newVitals,
           };
           setSelectedPatient(patientForFollowUp);
           setFollowUpDate(date);
