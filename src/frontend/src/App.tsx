@@ -67,6 +67,7 @@ import {
   Printer,
   Receipt,
   Redo2,
+  ScrollText,
   Search,
   Send,
   Stethoscope,
@@ -516,6 +517,7 @@ function Header({
   onChangeProfile,
   onBillingClick,
   onManageNursing,
+  onShowLicence,
 }: {
   onNavigate: (p: Page) => void;
   currentPage: Page;
@@ -528,6 +530,7 @@ function Header({
   onChangeProfile: () => void;
   onBillingClick: () => void;
   onManageNursing: () => void;
+  onShowLicence: () => void;
 }) {
   return (
     <header className="clinic-header-gradient text-white shadow-md no-print">
@@ -684,6 +687,14 @@ function Header({
                     <Users className="w-4 h-4 text-violet-600" />
                     Manage Nursing Users
                   </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={onShowLicence}
+                    className="gap-2 cursor-pointer"
+                    data-ocid="header.licence_button"
+                  >
+                    <ScrollText className="w-4 h-4 text-amber-600" />
+                    App Licence
+                  </DropdownMenuItem>
                 </>
               )}
               <DropdownMenuItem
@@ -715,6 +726,7 @@ function FrontDeskPage({
   onChangeProfile,
   onBillingClick,
   onManageNursing,
+  onShowLicence,
 }: {
   session: AuthSession;
   onNavigate: (p: Page) => void;
@@ -726,6 +738,7 @@ function FrontDeskPage({
   onChangeProfile: () => void;
   onBillingClick: () => void;
   onManageNursing: () => void;
+  onShowLicence: () => void;
 }) {
   return (
     <div
@@ -879,6 +892,14 @@ function FrontDeskPage({
                 >
                   <Users className="w-4 h-4 text-violet-600" />
                   Manage Nursing Users
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={onShowLicence}
+                  className="gap-2 cursor-pointer"
+                  data-ocid="frontdesk.licence_button"
+                >
+                  <ScrollText className="w-4 h-4 text-amber-600" />
+                  App Licence
                 </DropdownMenuItem>
               </>
             )}
@@ -6301,6 +6322,172 @@ function ChangeProfileDialog({
   );
 }
 
+// ── Licence Dialog ────────────────────────────────────────────────────────
+
+function LicenceDialog({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent
+        className="sm:max-w-2xl max-h-[80vh] overflow-y-auto"
+        data-ocid="licence.dialog"
+      >
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-clinic-blue">
+            <ScrollText className="w-5 h-5 text-amber-600" />
+            Software Licence Agreement
+          </DialogTitle>
+          <DialogDescription>
+            Official licence for Shreeji Clinic OPD Management System
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 text-sm py-2">
+          <div className="bg-amber-50 border border-amber-200 rounded-md px-4 py-3 text-amber-800 text-xs font-medium">
+            Proprietary — Single Clinic Use &nbsp;|&nbsp; Issued To: Shreeji
+            Clinic &nbsp;|&nbsp; Effective Date: 28 March 2026
+          </div>
+
+          <section>
+            <h3 className="font-semibold text-base text-clinic-blue mb-1">
+              1. Grant of Licence
+            </h3>
+            <p className="text-muted-foreground leading-relaxed">
+              This software is licensed exclusively to{" "}
+              <strong>Shreeji Clinic</strong> for internal clinical operations
+              including patient registration, prescription management, billing,
+              and related workflows. This licence is non-transferable and
+              non-sublicensable.
+            </p>
+          </section>
+
+          <section>
+            <h3 className="font-semibold text-base text-clinic-blue mb-1">
+              2. Permitted Use
+            </h3>
+            <ul className="list-disc list-inside text-muted-foreground space-y-1 leading-relaxed">
+              <li>Use on any device owned or operated by Shreeji Clinic</li>
+              <li>
+                Installation as a Progressive Web App (PWA) on authorised clinic
+                devices
+              </li>
+              <li>
+                Access by authorised users (doctors and nursing staff managed by
+                the clinic)
+              </li>
+            </ul>
+          </section>
+
+          <section>
+            <h3 className="font-semibold text-base text-clinic-blue mb-1">
+              3. Restrictions
+            </h3>
+            <ul className="list-disc list-inside text-muted-foreground space-y-1 leading-relaxed">
+              <li>
+                The application may not be copied, resold, or distributed to
+                third parties
+              </li>
+              <li>
+                Login credentials must not be shared outside authorised clinic
+                staff
+              </li>
+              <li>
+                Patient data stored within the app is confidential and subject
+                to applicable medical privacy laws
+              </li>
+            </ul>
+          </section>
+
+          <section>
+            <h3 className="font-semibold text-base text-clinic-blue mb-1">
+              4. Data Ownership
+            </h3>
+            <p className="text-muted-foreground leading-relaxed">
+              All patient records, prescriptions, and billing data entered into
+              the application belong exclusively to{" "}
+              <strong>Shreeji Clinic</strong>. The clinic is responsible for
+              data backup, security, and compliance with local health data
+              regulations.
+            </p>
+          </section>
+
+          <section>
+            <h3 className="font-semibold text-base text-clinic-blue mb-1">
+              5. Platform
+            </h3>
+            <p className="text-muted-foreground leading-relaxed">
+              This application is hosted on the{" "}
+              <strong>Internet Computer Protocol (ICP)</strong> via the Caffeine
+              platform. Continued operation is subject to the Caffeine platform
+              terms of service.
+            </p>
+          </section>
+
+          <section>
+            <h3 className="font-semibold text-base text-clinic-blue mb-1">
+              6. Disclaimer
+            </h3>
+            <p className="text-muted-foreground leading-relaxed">
+              This software is provided as-is for clinic management purposes. It
+              does not replace professional medical judgement. The clinic is
+              solely responsible for all clinical decisions made using this
+              application.
+            </p>
+          </section>
+
+          <div className="border rounded-md overflow-hidden mt-2">
+            <table className="w-full text-xs">
+              <thead className="bg-clinic-blue text-white">
+                <tr>
+                  <th className="px-3 py-2 text-left font-semibold">Name</th>
+                  <th className="px-3 py-2 text-left font-semibold">Role</th>
+                  <th className="px-3 py-2 text-left font-semibold">
+                    Credentials
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-t">
+                  <td className="px-3 py-2">Dr. Dhravid Patel</td>
+                  <td className="px-3 py-2">Doctor</td>
+                  <td className="px-3 py-2">BHMS, CCH G-32387</td>
+                </tr>
+                <tr className="border-t bg-muted/30">
+                  <td className="px-3 py-2">Dr. Zeel Patel</td>
+                  <td className="px-3 py-2">Doctor</td>
+                  <td className="px-3 py-2">BHMS, CCH G-34069</td>
+                </tr>
+                <tr className="border-t">
+                  <td className="px-3 py-2">Nursing Staff</td>
+                  <td className="px-3 py-2">Nursing</td>
+                  <td className="px-3 py-2">Managed by doctors</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p className="text-center text-xs text-muted-foreground italic pt-1">
+            "We listen, We Care, We Heal."
+            <br />
+            <span className="font-semibold not-italic text-clinic-blue">
+              Shreeji Clinic — OPD Management System
+            </span>
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Root App ───────────────────────────────────────────────────────────────
 
 export default function App() {
@@ -6366,6 +6553,7 @@ function AppShell({
   );
   const [changeProfileOpen, setChangeProfileOpen] = useState(false);
   const [manageNursingOpen, setManageNursingOpen] = useState(false);
+  const [licenceOpen, setLicenceOpen] = useState(false);
   const [billingPatient, setBillingPatient] = useState<LocalPatient | null>(
     null,
   );
@@ -6960,6 +7148,7 @@ function AppShell({
     onRestoreTrigger: handleRestoreTrigger,
     onChangeProfile: () => setChangeProfileOpen(true),
     onManageNursing: () => setManageNursingOpen(true),
+    onShowLicence: () => setLicenceOpen(true),
     onBillingClick: () => {
       toast.info("Select a patient from the dashboard to create a bill", {
         description: "Click the 'Bill' button next to a patient row",
@@ -7020,6 +7209,10 @@ function AppShell({
         <ManageNursingUsersDialog
           open={manageNursingOpen}
           onClose={() => setManageNursingOpen(false)}
+        />
+        <LicenceDialog
+          open={licenceOpen}
+          onClose={() => setLicenceOpen(false)}
         />
         <BillingDialog
           patient={billingPatient}
@@ -7169,6 +7362,7 @@ function AppShell({
         open={manageNursingOpen}
         onClose={() => setManageNursingOpen(false)}
       />
+      <LicenceDialog open={licenceOpen} onClose={() => setLicenceOpen(false)} />
 
       <BillingDialog
         patient={billingPatient}
